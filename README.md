@@ -78,7 +78,26 @@ Full change list: [Releases](https://github.com/Kruszoneq/macUSB/releases)
 4. Start creation and monitor stage-by-stage progress.
 5. Use the final result screen for next steps.
 
-> First launch note: macUSB requires two mandatory permissions for reliable installer creation: **enable `Allow in the Background` for macUSB** and **enable `Full Disk Access` for macUSB** in System Settings. Without these permissions, helper workflows may fail.
+> First launch note: macUSB requires two mandatory permissions for reliable installer creation: **enable Allow in the Background for macUSB** and **enable Full Disk Access for macUSB** in System Settings. Without these permissions, helper workflows may fail.
+
+<table align="center">
+  <tr>
+    <td align="center" valign="top">
+      <strong>Allow in the Background</strong><br>
+      <a href="docs/readme-assets/permissions/allow-in-the-background.png">
+        <img src="docs/readme-assets/permissions/allow-in-the-background.png" alt="macOS Login Items settings with macUSB enabled in Allow in the Background" width="360">
+      </a><br>
+      <sub>General → Login Items &amp; Extensions</sub>
+    </td>
+    <td align="center" valign="top">
+      <strong>Full Disk Access</strong><br>
+      <a href="docs/readme-assets/permissions/full-disk-access.png">
+        <img src="docs/readme-assets/permissions/full-disk-access.png" alt="macOS Privacy settings with macUSB enabled in Full Disk Access" width="360">
+      </a><br>
+      <sub>Privacy &amp; Security → Full Disk Access</sub>
+    </td>
+  </tr>
+</table>
 
 > Warning: All data on the selected USB drive will be erased.
 
