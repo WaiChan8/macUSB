@@ -1,22 +1,5 @@
 # macUSB Release Changelog
 
-This document stores changelogs for released macUSB versions.
-Each release entry must reflect shipped behavior and stay consistent with the current codebase and `docs/documents/development/DEVELOPMENT.md`.
-
-## Changelog Writing Guidelines
-
-- Write changelogs in English.
-- Use one clear intro paragraph for each release.
-- Keep the intro as one coherent block (not split into disconnected lines).
-- Use section order: `ADDED`, `CHANGES`, `IMPROVEMENTS`.
-- Keep bullets factual and implementation-based; avoid unverifiable marketing claims.
-- When a feature is conditional, state the condition explicitly (for example permissions, toggles, runtime state).
-- Use consistent menu path formatting in release notes: `Options → ...`, `Help → ...`, `Tools → ...`.
-- Keep naming consistent with the app and documentation (for example `SMAppService`, `Liquid Glass`, system version names).
-- Before publishing, verify that entries match actual implemented behavior and `DEVELOPMENT.md`.
-
----
-
 ## v2.0
 
 macUSB v2.0 introduces a refreshed interface with full support for the **Liquid Glass** effect, tailored to the modern macOS Tahoe aesthetic, and a new architecture powered by native system services that improves reliability and streamlines the installer media preparation process.

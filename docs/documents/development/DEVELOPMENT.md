@@ -10,6 +10,13 @@
 >
 > IMPORTANT RULE FOR AI AGENTS: Reading this document is mandatory, but not sufficient on its own.
 > Before proposing or implementing changes, AI agents must also analyze the current codebase to build accurate runtime and architecture context.
+>
+> CRITICAL RUNTIME REQUIREMENT: For correct operation on modern macOS versions, `macUSB` requires both:
+> 1) active **`Full Disk Access`** for `macUSB` (Polish UI label: **`Pełny dostęp do dysku`**),
+> 2) active **`Allow in the Background`** for `macUSB` in System Settings:
+> `General` -> `Login Items & Extensions` (Polish UI path: `Ogólne` -> `Rzeczy i rozszerzenia otwierane podczas logowania` -> `Aktywność aplikacji w tle`).
+>
+> Missing any of the above can cause helper workflows to fail even when helper registration/XPC health is reported as OK (for example: `Operation not permitted`, `Could not validate sizes`, `bless`/`createinstallmedia` failures).
 
 ## Table of Contents
 1. [Purpose and Scope](#purpose-and-scope)
@@ -811,9 +818,11 @@ Minimal runbook for day-to-day diagnostics and release safety:
 Each entry below lists a file and its role. This section is exhaustive for tracked source and config files.
 
 - `LICENSE.txt` — MIT license text.
-- `README.md` — Public project overview, download methods, requirements, supported versions, languages.
+- `README.md` — Public project overview, download methods, requirements, supported versions, languages, and first-launch permission requirements (`Allow in the Background` + `Full Disk Access` for `macUSB`).
 - `version.json` — Remote version metadata for update checks.
 - `docs/documents/development/DEVELOPMENT.md` — Internal architecture/runtime contract for contributors and AI agents.
+- `docs/documents/changelog/CHANGELOG.md` — Release changelog entries (release content only; no writing rules section).
+- `docs/documents/changelog/CHANGELOG_RULES.md` — Dedicated rules for writing release notes for `CHANGELOG.md`.
 - `docs/readme-assets/images/macUSBreadmepreview.png` — Current README hero preview image.
 - `docs/readme-assets/images/macUSBicon.png` — Current README app icon image.
 - `docs/readme-assets/app-screens/welcome-view.png` — README workflow screenshot: Welcome screen.
@@ -942,6 +951,7 @@ This section lists the main call relationships and data flow.
 - IMPORTANT RULE FOR AI AGENTS: Reading this document is mandatory, but not sufficient on its own.
 - Before proposing or implementing changes, AI agents must also analyze the current codebase to build accurate runtime and architecture context.
 - AI agents must write git commit messages in English: a clear title/summary line plus a concise body describing key changes.
+- If a commit includes updates to `docs/documents/development/DEVELOPMENT.md`, `docs/documents/changelog/CHANGELOG.md`, and/or `docs/documents/changelog/CHANGELOG_RULES.md`, do not explicitly enumerate those documentation-file updates in the commit title or commit body.
 - Do not use escaped newline sequences like `\n` in commit message text; use normal multi-line commit formatting only.
 - AI agents should commit changes comprehensively (include all modified project files) by default.
 - Exceptions to comprehensive commits:
