@@ -356,7 +356,8 @@ Key flags set by analysis:
 - `isPPC`: PowerPC-era flows (Tiger/Leopard/Snow Leopard; detected via version/name)
 - `isUnsupportedSierra`: Sierra installer version is not `12.6.06`
 - `showUnsupportedMessage`: used for UI warnings
-- Current implementation detail: in `.app` analysis branch, `isMavericks` is computed and stored, but `isSystemDetected` does not include `isMavericks`; practical Mavericks install path is therefore image-driven (`.dmg/.iso/.cdr`).
+- Intentional product rule: Mavericks support is image-driven (`.dmg/.iso/.cdr`) for a specifically validated Mavericks image/version source path, and `.app` Mavericks sources are intentionally excluded from supported install flow.
+- Implementation note: in `.app` analysis branch, `isMavericks` is computed and stored, but `isSystemDetected` does not include `isMavericks` by design to enforce the image-only Mavericks path.
 
 Explicit unsupported case:
 - Mac OS X Panther (10.3) triggers unsupported flow immediately.
@@ -416,6 +417,7 @@ Used for most modern macOS installers.
 - Helper copies the source image to TEMP.
 - If `needsFormatting == true` (non-PPC), a `GPT + HFS+` preformat stage runs in helper before restore.
 - Runs `asr imagescan`, then `asr restore` in helper (restore target resolved by helper).
+- Scope rule: Mavericks workflow is intended for image sources only; `.app` Mavericks is intentionally not accepted as a supported creation path.
 
 ### PowerPC Flow
 - Formats disk with `diskutil partitionDisk` using APM + HFS+.
@@ -983,7 +985,7 @@ This section lists the main call relationships and data flow.
 ---
 
 ## 15. Potential Redundancies and Delicate Areas
-- Update checking is duplicated: `WelcomeView` and `UpdateChecker` both read `version.json`.
+- Update checking uses two intentional entry points: automatic startup check in `WelcomeView` and manual on-demand check from menu via `UpdateChecker`; this is expected behavior and they are not the same trigger path (no automatic parallel run from a single trigger).
 - Legacy detection and special cases are complex: changes in `AnalysisLogic` affect multiple installation paths.
 - Localization: some Polish strings are hard-coded in `Text("...")`; ensure keys exist in `Localizable.xcstrings`.
 - Cleanup logic still has multiple safety nets (helper final stage, cancel/window emergency paths, `FinishUSBView` fallback); preserve their non-destructive intent when refactoring.
