@@ -77,6 +77,23 @@ final class AnalysisLogic: ObservableObject {
 
     @Published var isCapacitySufficient: Bool = false
     @Published var capacityCheckFinished: Bool = false
+    @Published var requiredUSBCapacityGB: Int? = nil
+
+    var requiredUSBCapacityDisplayValue: String {
+        requiredUSBCapacityGB.map(String.init) ?? "--"
+    }
+
+    private var requiredUSBCapacityBytes: Int? {
+        guard let requiredGB = requiredUSBCapacityGB else { return nil }
+        switch requiredGB {
+        case 16:
+            return 15_000_000_000
+        case 32:
+            return 28_000_000_000
+        default:
+            return requiredGB * 1_000_000_000
+        }
+    }
 
     // Computed: true only when app has recognized a supported system and can proceed normally
     var isRecognizedAndSupported: Bool {
@@ -87,6 +104,20 @@ final class AnalysisLogic: ObservableObject {
         let detected = isSystemDetected || isPPC
         let unsupported = showUnsupportedMessage || isUnsupportedSierra
         return recognized && hasValidSourceOrPPC && detected && !unsupported
+    }
+
+    private func updateRequiredUSBCapacity(rawVersion: String, name: String) {
+        guard let majorVersion = marketingMajorVersion(raw: rawVersion, name: name) else {
+            requiredUSBCapacityGB = nil
+            return
+        }
+        requiredUSBCapacityGB = (majorVersion >= 15) ? 32 : 16
+    }
+
+    private func marketingMajorVersion(raw: String, name: String) -> Int? {
+        let marketingVersion = formatMarketingVersion(raw: raw, name: name)
+        guard let majorToken = marketingVersion.split(separator: ".").first else { return nil }
+        return Int(majorToken)
     }
     
     // MARK: - Helper to enumerate external hard drives (non-removable)
@@ -188,6 +219,7 @@ final class AnalysisLogic: ObservableObject {
                     self.legacyArchInfo = nil
                     self.userSkippedAnalysis = false
                     self.shouldShowMavericksDialog = false
+                    self.requiredUSBCapacityGB = nil
                 }
                 self.log("Lokalizacja wybranego pliku: \(url.path)")
                 self.log("Źródło do rozpoznania wersji: \(url.path)")
@@ -223,6 +255,7 @@ final class AnalysisLogic: ObservableObject {
                 self.legacyArchInfo = nil
                 self.userSkippedAnalysis = false
                 self.shouldShowMavericksDialog = false
+                self.requiredUSBCapacityGB = nil
             }
             self.log("Wybrano plik w formacie .\(ext)")
             self.log("Lokalizacja wybranego pliku: \(url.path)")
@@ -244,6 +277,7 @@ final class AnalysisLogic: ObservableObject {
         isUnsupportedSierra = false
         isPPC = false
         isMavericks = false
+        requiredUSBCapacityGB = nil
 
         let ext = url.pathExtension.lowercased()
         self.log("Wykryto rozszerzenie: \(ext)")
@@ -270,6 +304,7 @@ final class AnalysisLogic: ObservableObject {
                             let prefix = name.contains("macOS") ? "macOS" : (name.contains("OS X") ? "OS X" : "macOS")
 
                             self.recognizedVersion = "\(prefix) \(cleanName) \(friendlyVer)"
+                            self.updateRequiredUSBCapacity(rawVersion: rawVer, name: name)
                             self.sourceAppURL = appURL
                             self.updateDetectedSystemIcon(from: appURL)
 
@@ -451,6 +486,7 @@ final class AnalysisLogic: ObservableObject {
                         } else {
                             // Użyto String(localized:) aby ten ciąg został wykryty, mimo że jest przypisywany do zmiennej
                             self.recognizedVersion = String(localized: "Nie rozpoznano instalatora")
+                            self.requiredUSBCapacityGB = nil
                             self.log("Analiza zakończona: nie rozpoznano instalatora.")
                             AppLogging.separator()
                         }
@@ -478,6 +514,7 @@ final class AnalysisLogic: ObservableObject {
                             let prefix = name.contains("macOS") ? "macOS" : (name.contains("OS X") ? "OS X" : "macOS")
 
                             self.recognizedVersion = "\(prefix) \(cleanName) \(friendlyVer)"
+                            self.updateRequiredUSBCapacity(rawVersion: rawVer, name: name)
                             self.sourceAppURL = appURL
                             self.updateDetectedSystemIcon(from: appURL)
 
@@ -622,6 +659,7 @@ final class AnalysisLogic: ObservableObject {
                             }
                         } else {
                             self.recognizedVersion = String(localized: "Nie rozpoznano instalatora")
+                            self.requiredUSBCapacityGB = nil
                             self.log("Analiza zakończona: nie rozpoznano instalatora.")
                             AppLogging.separator()
                         }
@@ -672,6 +710,7 @@ final class AnalysisLogic: ObservableObject {
                     self.legacyArchInfo = nil
                     self.selectedDrive = nil
                     self.capacityCheckFinished = false
+                    self.requiredUSBCapacityGB = 16
                 }
                 let flags = [self.isPPC ? "isPPC" : nil].compactMap { $0 }.joined(separator: ", ")
                 self.log("Ustawiono Tiger Multi DVD: recognizedVersion=\(self.recognizedVersion). Flagi: \(flags.isEmpty ? "brak" : flags)")
@@ -945,9 +984,12 @@ final class AnalysisLogic: ObservableObject {
     }
 
     func checkCapacity() {
-        guard let drive = selectedDrive else { capacityCheckFinished = false; return }
+        guard let drive = selectedDrive, let minCapacity = requiredUSBCapacityBytes else {
+            isCapacitySufficient = false
+            capacityCheckFinished = false
+            return
+        }
         if let values = try? drive.url.resourceValues(forKeys: [.volumeTotalCapacityKey]), let capacity = values.volumeTotalCapacity {
-            let minCapacity: Int = 15_000_000_000
             withAnimation { isCapacitySufficient = capacity >= minCapacity; capacityCheckFinished = true }
         } else { isCapacitySufficient = false; capacityCheckFinished = true }
     }
@@ -986,6 +1028,7 @@ final class AnalysisLogic: ObservableObject {
                 self.legacyArchInfo = nil
                 self.userSkippedAnalysis = false
                 self.shouldShowMavericksDialog = false
+                self.requiredUSBCapacityGB = nil
 
                 self.availableDrives = []
                 self.selectedDrive = nil

@@ -4,78 +4,78 @@
     "" : {
 
     },
-    "• Do utworzenia instalatora potrzebny jest nośnik USB o pojemności minimum 16 GB" : {
+    "• Do utworzenia instalatora potrzebny jest nośnik USB o pojemności minimum %@ GB" : {
       "localizations" : {
         "de" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "• Zum Erstellen des Installers ist ein USB-Laufwerk mit mindestens 16 GB erforderlich"
+            "value" : "• Zum Erstellen des Installers ist ein USB-Laufwerk mit mindestens %@ GB erforderlich"
           }
         },
         "en" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "• A USB drive with a minimum capacity of 16 GB is required to create the installer"
+            "value" : "• A USB drive with a minimum capacity of %@ GB is required to create the installer"
           }
         },
         "es" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "• Se requiere una memoria USB con una capacidad mínima de 16 GB para crear el instalador"
+            "value" : "• Se requiere una memoria USB con una capacidad mínima de %@ GB para crear el instalador"
           }
         },
         "fr" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "• Une clé USB d'une capacité minimale de 16 Go est requise pour créer l'installateur"
+            "value" : "• Une clé USB d'une capacité minimale de %@ Go est requise pour créer l'installateur"
           }
         },
         "it" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "• Per creare il programma di installazione è necessaria un'unità USB con una capacità minima di 16 GB"
+            "value" : "• Per creare il programma di installazione è necessaria un'unità USB con una capacità minima di %@ GB"
           }
         },
         "ja" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "• インストーラを作成するには、最低16GBの容量を持つUSBメモリが必要です"
+            "value" : "• インストーラを作成するには、最低%@GBの容量を持つUSBメモリが必要です"
           }
         },
         "pt-BR" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "• É necessário um pen drive com capacidade mínima de 16 GB para criar o instalador"
+            "value" : "• É necessário um pen drive com capacidade mínima de %@ GB para criar o instalador"
           }
         },
         "ru" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "• Для создания установщика требуется USB-накопитель емкостью не менее 16 ГБ"
+            "value" : "• Для создания установщика требуется USB-накопитель емкостью не менее %@ ГБ"
           }
         },
         "tr" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "• Yükleyiciyi oluşturmak için minimum 16 GB kapasiteli bir USB sürücüsüne ihtiyacınız vardır"
+            "value" : "• Yükleyiciyi oluşturmak için minimum %@ GB kapasiteli bir USB sürücüsüne ihtiyacınız vardır"
           }
         },
         "uk" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "• Для створення інсталятора потрібен USB-накопичувач мінімальним об’ємом 16 ГБ"
+            "value" : "• Для створення інсталятора потрібен USB-накопичувач мінімальним об’ємом %@ ГБ"
           }
         },
         "vi" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "• Để tạo bộ cài đặt, bạn cần có ổ USB có dung lượng tối thiểu 16 GB"
+            "value" : "• Để tạo bộ cài đặt, bạn cần có ổ USB có dung lượng tối thiểu %@ GB"
           }
         },
         "zh-Hans" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "• 创建安装程序需要至少 16 GB 容量的 U 盘"
+            "value" : "• 创建安装程序需要至少 %@ GB 容量的 U 盘"
           }
         }
       }
@@ -3449,7 +3449,6 @@
       }
     },
     "DEBUG" : {
-      "extractionState" : "stale",
       "localizations" : {
         "de" : {
           "stringUnit" : {
@@ -7032,7 +7031,6 @@
       }
     },
     "Informacje" : {
-      "extractionState" : "stale",
       "localizations" : {
         "de" : {
           "stringUnit" : {
@@ -7799,7 +7797,6 @@
       }
     },
     "Lokalizacja aplikacji: środowisko Xcode (bypass DEBUG)" : {
-      "extractionState" : "stale",
       "localizations" : {
         "de" : {
           "stringUnit" : {
@@ -11654,7 +11651,6 @@
       }
     },
     "Otwórz macUSB_temp" : {
-      "extractionState" : "stale",
       "localizations" : {
         "de" : {
           "stringUnit" : {
@@ -13585,7 +13581,6 @@
       }
     },
     "Przejdź do podsumowania (Big Sur) (2s delay)" : {
-      "extractionState" : "stale",
       "localizations" : {
         "de" : {
           "stringUnit" : {
@@ -13668,7 +13663,6 @@
       }
     },
     "Przejdź do podsumowania (Tiger) (2s delay)" : {
-      "extractionState" : "stale",
       "localizations" : {
         "de" : {
           "stringUnit" : {
@@ -18905,7 +18899,6 @@
       }
     },
     "Wybrany folder nie istnieje" : {
-      "extractionState" : "stale",
       "localizations" : {
         "de" : {
           "stringUnit" : {
@@ -19755,78 +19748,78 @@
         }
       }
     },
-    "Wymagane jest minimum 16 GB." : {
+    "Wymagane jest minimum %@ GB." : {
       "localizations" : {
         "de" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "Mindestens 16 GB erforderlich."
+            "value" : "Mindestens %@ GB erforderlich."
           }
         },
         "en" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "Min 16GB required."
+            "value" : "Min %@ GB required."
           }
         },
         "es" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "Mínimo 16 GB requeridos."
+            "value" : "Mínimo %@ GB requeridos."
           }
         },
         "fr" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "Minimum 16 Go requis."
+            "value" : "Minimum %@ Go requis."
           }
         },
         "it" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "È richiesto un minimo di 16 GB."
+            "value" : "È richiesto un minimo di %@ GB."
           }
         },
         "ja" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "最低16GBが必要です。"
+            "value" : "最低%@GBが必要です。"
           }
         },
         "pt-BR" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "Mínimo 16 GB necessários."
+            "value" : "Mínimo %@ GB necessários."
           }
         },
         "ru" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "Требуется минимум 16 ГБ."
+            "value" : "Требуется минимум %@ ГБ."
           }
         },
         "tr" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "Minimum 16 GB gereklidir."
+            "value" : "Minimum %@ GB gereklidir."
           }
         },
         "uk" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "Необхідно мінімум 16 ГБ."
+            "value" : "Необхідно мінімум %@ ГБ."
           }
         },
         "vi" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "Yêu cầu tối thiểu 16 GB."
+            "value" : "Yêu cầu tối thiểu %@ GB."
           }
         },
         "zh-Hans" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "至少需要 16 GB。"
+            "value" : "至少需要 %@ GB。"
           }
         }
       }
