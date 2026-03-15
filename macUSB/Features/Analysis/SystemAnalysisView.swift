@@ -367,7 +367,14 @@ struct SystemAnalysisView: View {
                     VStack(alignment: .leading, spacing: 5) {
                         Text("Wymagania sprzętowe").font(.headline)
                         VStack(alignment: .leading, spacing: 3) {
-                            Text("• Do utworzenia instalatora potrzebny jest nośnik USB o pojemności minimum 16 GB").font(.subheadline).foregroundColor(.secondary)
+                            Text(
+                                String(
+                                    format: String(localized: "• Do utworzenia instalatora potrzebny jest nośnik USB o pojemności minimum %@ GB"),
+                                    logic.requiredUSBCapacityDisplayValue
+                                )
+                            )
+                            .font(.subheadline)
+                            .foregroundColor(.secondary)
                             Text("• Zalecane jest użycie dysku w standardzie USB 3.0 lub szybszym").font(.subheadline).foregroundColor(.secondary)
                         }
                     }
@@ -406,7 +413,14 @@ struct SystemAnalysisView: View {
                             Image(systemName: "xmark.circle.fill").font(sectionIconFont).foregroundColor(.red).frame(width: MacUSBDesignTokens.iconColumnWidth)
                             VStack(alignment: .leading) {
                                 Text("Wybrany nośnik USB ma za małą pojemność").font(.headline).foregroundColor(.red)
-                                Text("Wymagane jest minimum 16 GB.").font(.caption).foregroundColor(.red.opacity(0.8))
+                                Text(
+                                    String(
+                                        format: String(localized: "Wymagane jest minimum %@ GB."),
+                                        logic.requiredUSBCapacityDisplayValue
+                                    )
+                                )
+                                .font(.caption)
+                                .foregroundColor(.red.opacity(0.8))
                             }
                         }
                     }

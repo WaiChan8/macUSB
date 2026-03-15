@@ -1,5 +1,14 @@
 # macUSB Release Changelog
 
+## v2.1
+
+This release refines USB target validation by making the minimum required drive size adjust automatically to the detected macOS installer generation.
+
+### CHANGES
+- USB minimum-capacity validation is now dynamic and tied to detected installer generation: Sonoma and older require 16 GB, Sequoia and newer require 32 GB.
+
+---
+
 ## v2.0.1
 
 This patch release focuses on resolving installer creation failures by enforcing the required **Full Disk Access** permission for macUSB before critical workflows continue.
