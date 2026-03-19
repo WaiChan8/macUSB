@@ -1,8 +1,8 @@
 # macUSB Release Changelog
 
-## v2.1
+## v2.0.2
 
-This release refines USB target validation by making the minimum required drive size adjust automatically to the detected macOS installer generation.
+This patch release improves installer workflow reliability by tightening USB target validation rules and strengthening recovery behavior in helper and source-analysis edge cases.
 
 ### CHANGES
 - USB minimum-capacity validation is now dynamic and tied to detected installer generation: Sonoma and older require 16 GB, Sequoia and newer require 32 GB.
@@ -10,7 +10,7 @@ This release refines USB target validation by making the minimum required drive 
 
 ### IMPROVEMENTS
 - Improved helper repair with clearer diagnostics and more reliable recovery when macOS blocks background helper activation.
-- When a selected .cdr or .iso source image is already mounted in macOS, analysis now shows a clear system alert
+- When a selected `.cdr` or `.iso` source image is already mounted in macOS, analysis now shows a clear system alert and instructs the user to unmount the image before retrying.
 
 ---
 
