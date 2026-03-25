@@ -3,7 +3,8 @@
 This document is the single reference for how the application behaves at runtime.
 
 It is intentionally separated from process rules:
-- Process/workflow rules are in `docs/rules/*`.
+- Process/workflow/commit/changelog rules for agents are in `docs/AGENTS.md`.
+- `docs/AGENTS.md` also contains a concise set of critical runtime invariants for day-to-day agent work.
 - Runtime/product behavior is in `docs/reference/*`.
 
 ## Table of Contents
@@ -241,9 +242,7 @@ Update when debug menu actions, debug route payloads, or debug safety constraint
 Core docs:
 - `docs/reference/APPLICATION_REFERENCE.md` — runtime behavior contract.
 - `docs/reference/CHANGELOG.md` — release notes for shipped versions.
-- `docs/rules/WORKFLOW_RULES.md` — end-to-end process playbook.
-- `docs/rules/COMMIT_RULES.md` — commit rules.
-- `docs/rules/CHANGELOG_RULES.md` — release-note writing rules.
+- `docs/AGENTS.md` — end-to-end process, commit rules, and release-note rules for AI agents.
 
 Core runtime areas:
 - `macUSB/Features/Analysis/*` — source analysis and USB selection behavior.
