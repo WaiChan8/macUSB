@@ -65,7 +65,7 @@ final class MacOSDownloaderLogic: ObservableObject {
         cancelDiscovery(updateState: false)
         state = .loading
         errorText = nil
-        statusText = String(localized: "Laczenie z serwerami Apple...")
+        statusText = String(localized: "Łączenie z serwerami Apple...")
 
         AppLogging.stage("Downloader: Rozpoczecie sprawdzania dostepnych wersji")
         AppLogging.info("Start sprawdzania dostepnych instalatorow macOS/OS X.", category: "Downloader")
@@ -232,7 +232,7 @@ private struct MacOSCatalogService {
             }
         }
 
-        phase(String(localized: "Dolaczanie starszych wersji z Apple Support..."))
+        phase(String(localized: "Dołączanie starszych wersji z Apple Support..."))
         AppLogging.info("Dolaczanie starszych wpisow z Apple Support.", category: "Downloader")
         let legacyEntries = try await fetchLegacySupportEntries()
         entries.append(contentsOf: legacyEntries)
@@ -240,7 +240,7 @@ private struct MacOSCatalogService {
         let uniqueEntries = deduplicated(entries)
         AppLogging.info("Po deduplikacji pozostalo \(uniqueEntries.count) wpisow stable.", category: "Downloader")
 
-        phase(String(localized: "Sprawdzanie rozmiarow instalatorow..."))
+        phase(String(localized: "Sprawdzanie rozmiarów instalatorów..."))
         AppLogging.info("Rozpoczecie sprawdzania rozmiarow instalatorow.", category: "Downloader")
         let entriesWithSizes = try await enrichedWithInstallerSizes(uniqueEntries)
         AppLogging.info("Zakonczono sprawdzanie rozmiarow instalatorow.", category: "Downloader")

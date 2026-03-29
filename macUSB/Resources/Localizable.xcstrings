@@ -3703,7 +3703,7 @@
         }
       }
     },
-    "Dolaczanie starszych wersji z Apple Support..." : {
+    "Dołączanie starszych wersji z Apple Support..." : {
 
     },
     "Dostępna aktualizacja!" : {
@@ -7672,10 +7672,10 @@
         }
       }
     },
-    "Łączę się z serwerami Apple i wykrywam dostępne instalatory." : {
+    "Łączę się z serwerami Apple i wykrywam dostępne instalatory..." : {
 
     },
-    "Laczenie z serwerami Apple..." : {
+    "Łączenie z serwerami Apple..." : {
 
     },
     "Lista oficjalnych instalatorów macOS i OS X dostępnych na serwerach Apple." : {
@@ -11329,9 +11329,6 @@
           }
         }
       }
-    },
-    "Oczekiwanie na wyniki" : {
-
     },
     "Odłączono nośnik USB" : {
       "localizations" : {
@@ -15144,7 +15141,7 @@
     "Sprawdzanie anulowane" : {
 
     },
-    "Sprawdzanie rozmiarow instalatorow..." : {
+    "Sprawdzanie rozmiarów instalatorów..." : {
 
     },
     "Sprawdzanie statusu..." : {
@@ -16767,9 +16764,6 @@
           }
         }
       }
-    },
-    "Trwa sprawdzanie dostępnych wersji." : {
-
     },
     "Türkçe" : {
       "localizations" : {

@@ -80,74 +80,69 @@ struct MacOSDownloaderWindowView: View {
     @StateObject private var logic = MacOSDownloaderLogic()
     @State private var isOptionsPresented = false
     @State private var showAllAvailableVersions = false
+    @State private var selectedInstallerID: String?
 
     var body: some View {
-        ZStack {
-            VStack(alignment: .leading, spacing: MacUSBDesignTokens.sectionGroupSpacing) {
-                VStack(alignment: .leading, spacing: 8) {
-                    Text("Menedżer pobierania macOS")
-                        .font(.title3.weight(.semibold))
-                    Text("Lista oficjalnych instalatorów macOS i OS X dostępnych na serwerach Apple.")
-                        .font(.body)
-                        .foregroundStyle(.secondary)
-                        .fixedSize(horizontal: false, vertical: true)
-                }
-                .padding(MacUSBDesignTokens.panelInnerPadding)
-                .frame(maxWidth: .infinity, alignment: .leading)
-                .macUSBPanelSurface(.subtle)
-
-                VStack(alignment: .leading, spacing: 10) {
-                    HStack(alignment: .center, spacing: 10) {
-                        Text("Lista systemów dostępnych do pobrania")
-                            .font(.headline)
-
-                        Spacer()
-
-                        Button {
-                            isOptionsPresented = true
-                        } label: {
-                            HStack(spacing: 6) {
-                                Image(systemName: "slider.horizontal.3")
-                                Text("Opcje")
-                            }
-                            .padding(.horizontal, 10)
-                            .padding(.vertical, 6)
-                        }
-                        .macUSBSecondaryButtonStyle()
-                    }
-
-                    installerListArea
-                        .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .topLeading)
-                }
+        VStack(alignment: .leading, spacing: MacUSBDesignTokens.sectionGroupSpacing) {
+            VStack(alignment: .leading, spacing: 8) {
+                Text("Menedżer pobierania macOS")
+                    .font(.title3.weight(.semibold))
+                Text("Lista oficjalnych instalatorów macOS i OS X dostępnych na serwerach Apple.")
+                    .font(.body)
+                    .foregroundStyle(.secondary)
+                    .fixedSize(horizontal: false, vertical: true)
             }
-            .padding(.horizontal, MacUSBDesignTokens.contentHorizontalPadding)
-            .padding(.top, MacUSBDesignTokens.contentVerticalPadding)
-            .frame(
-                width: MacUSBDesignTokens.windowWidth,
-                height: contentHeight,
-                alignment: .topLeading
-            )
-            .safeAreaInset(edge: .bottom) {
-                BottomActionBar {
+            .padding(MacUSBDesignTokens.panelInnerPadding)
+            .frame(maxWidth: .infinity, alignment: .leading)
+            .macUSBPanelSurface(.subtle)
+
+            VStack(alignment: .leading, spacing: 10) {
+                HStack(alignment: .center, spacing: 10) {
+                    Text("Lista systemów dostępnych do pobrania")
+                        .font(.headline)
+
+                    Spacer()
+
                     Button {
-                        logic.cancelDiscovery()
-                        onClose()
+                        isOptionsPresented = true
                     } label: {
-                        HStack {
-                            Text("Zamknij")
-                            Image(systemName: "xmark.circle.fill")
+                        HStack(spacing: 6) {
+                            Image(systemName: "slider.horizontal.3")
+                            Text("Opcje")
                         }
-                        .frame(maxWidth: .infinity)
-                        .padding(8)
+                        .padding(.horizontal, 10)
+                        .padding(.vertical, 6)
                     }
-                    .macUSBPrimaryButtonStyle()
+                    .macUSBSecondaryButtonStyle()
+                    .disabled(isDiscoveryInProgress)
+                    .opacity(isDiscoveryInProgress ? 0.65 : 1.0)
                 }
-            }
 
-            if logic.isLoading {
-                discoveryOverlay
-                    .transition(.opacity)
-                    .zIndex(2)
+                installerListArea
+                    .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .topLeading)
+            }
+        }
+        .padding(.horizontal, MacUSBDesignTokens.contentHorizontalPadding)
+        .padding(.top, MacUSBDesignTokens.contentVerticalPadding)
+        .frame(
+            width: MacUSBDesignTokens.windowWidth,
+            height: contentHeight,
+            alignment: .topLeading
+        )
+        .safeAreaInset(edge: .bottom) {
+            BottomActionBar {
+                Button {
+                    logic.cancelDiscovery()
+                    onClose()
+                } label: {
+                    HStack {
+                        Text("Zamknij")
+                        Image(systemName: "xmark.circle.fill")
+                    }
+                    .frame(maxWidth: .infinity)
+                    .padding(8)
+                }
+                .macUSBPrimaryButtonStyle()
             }
         }
         .sheet(isPresented: $isOptionsPresented) {
@@ -156,47 +151,114 @@ struct MacOSDownloaderWindowView: View {
         .task {
             logic.startDiscovery()
         }
+        .onChange(of: logic.familyGroups) {
+            ensureSelectedEntryIsVisible()
+        }
+        .onChange(of: showAllAvailableVersions) {
+            ensureSelectedEntryIsVisible()
+        }
         .onDisappear {
             logic.cancelDiscovery(updateState: false)
         }
     }
 
+    private var isDiscoveryInProgress: Bool {
+        switch logic.state {
+        case .idle, .loading:
+            return true
+        case .cancelled, .failed, .loaded:
+            return false
+        }
+    }
+
     private var installerListArea: some View {
-        Group {
-            switch logic.state {
-            case .idle, .loading:
-                listMessageView(
-                    title: String(localized: "Oczekiwanie na wyniki"),
-                    description: String(localized: "Trwa sprawdzanie dostępnych wersji.")
-                )
-            case .cancelled:
-                if logic.familyGroups.isEmpty {
-                    listMessageView(
-                        title: String(localized: "Sprawdzanie anulowane"),
-                        description: String(localized: "Otwórz downloader ponownie, aby uruchomić nowe sprawdzanie.")
-                    )
-                } else {
-                    installerSectionsView
-                }
-            case .failed:
-                listMessageView(
-                    title: String(localized: "Nie udało się pobrać listy"),
-                    description: logic.errorText ?? String(localized: "Wystąpił błąd połączenia z serwerami Apple.")
-                )
-            case .loaded:
-                if logic.familyGroups.isEmpty {
-                    listMessageView(
-                        title: String(localized: "Brak dostępnych wersji"),
-                        description: String(localized: "Nie znaleziono publicznych instalatorów w aktualnym katalogu Apple.")
-                    )
-                } else {
-                    installerSectionsView
-                }
+        ZStack(alignment: .topLeading) {
+            if isDiscoveryInProgress {
+                discoveryStatusView
+                    .transition(.move(edge: .top).combined(with: .opacity))
+            } else {
+                postDiscoveryContent
+                    .transition(.opacity)
             }
         }
+        .animation(.easeInOut(duration: 0.22), value: isDiscoveryInProgress)
         .padding(MacUSBDesignTokens.panelInnerPadding)
         .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .topLeading)
         .macUSBPanelSurface(.neutral)
+        .clipped()
+    }
+
+    @ViewBuilder
+    private var postDiscoveryContent: some View {
+        switch logic.state {
+        case .cancelled:
+            if logic.familyGroups.isEmpty {
+                listMessageView(
+                    title: String(localized: "Sprawdzanie anulowane"),
+                    description: String(localized: "Otwórz downloader ponownie, aby uruchomić nowe sprawdzanie.")
+                )
+            } else {
+                installerSectionsView
+            }
+        case .failed:
+            listMessageView(
+                title: String(localized: "Nie udało się pobrać listy"),
+                description: logic.errorText ?? String(localized: "Wystąpił błąd połączenia z serwerami Apple.")
+            )
+        case .loaded:
+            if logic.familyGroups.isEmpty {
+                listMessageView(
+                    title: String(localized: "Brak dostępnych wersji"),
+                    description: String(localized: "Nie znaleziono publicznych instalatorów w aktualnym katalogu Apple.")
+                )
+            } else {
+                installerSectionsView
+            }
+        case .idle, .loading:
+            EmptyView()
+        }
+    }
+
+    private var discoveryStatusView: some View {
+        VStack(alignment: .leading, spacing: 14) {
+            HStack(alignment: .center, spacing: 12) {
+                Image(nsImage: NSApp.applicationIconImage)
+                    .resizable()
+                    .frame(width: 40, height: 40)
+                    .cornerRadius(9)
+
+                VStack(alignment: .leading, spacing: 2) {
+                    Text("Sprawdzanie wersji macOS")
+                        .font(.headline)
+                    Text("Łączę się z serwerami Apple i wykrywam dostępne instalatory...")
+                        .font(.subheadline)
+                        .foregroundStyle(.secondary)
+                        .fixedSize(horizontal: false, vertical: true)
+                }
+            }
+
+            ProgressView()
+                .progressViewStyle(.linear)
+
+            if !logic.statusText.isEmpty {
+                Text(logic.statusText)
+                    .font(.caption)
+                    .foregroundStyle(.secondary)
+            }
+
+            Button {
+                logic.cancelDiscovery()
+            } label: {
+                Text("Anuluj")
+                    .frame(maxWidth: .infinity)
+                    .padding(8)
+            }
+            .macUSBSecondaryButtonStyle()
+            .padding(.top, 6)
+        }
+        .padding(16)
+        .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .topLeading)
+        .macUSBPanelSurface(.subtle)
     }
 
     private var installerSectionsView: some View {
@@ -218,27 +280,72 @@ struct MacOSDownloaderWindowView: View {
     }
 
     private func installerEntryRow(_ entry: MacOSInstallerEntry) -> some View {
-        HStack(alignment: .center, spacing: 12) {
-            installerIconView(for: entry)
+        let isSelected = selectedInstallerID == entry.id
 
-            VStack(alignment: .leading, spacing: 1) {
-                Text("\(entry.name) \(entry.version)")
-                    .font(.body.weight(.medium))
-                    .foregroundStyle(.primary)
+        return VStack(alignment: .leading, spacing: 10) {
+            HStack(alignment: .center, spacing: 12) {
+                installerIconView(for: entry)
 
-                if let secondaryText = entrySecondaryText(for: entry) {
-                    Text(secondaryText)
-                        .font(.caption2.italic())
-                        .foregroundStyle(.secondary)
+                VStack(alignment: .leading, spacing: 1) {
+                    Text("\(entry.name) \(entry.version)")
+                        .font(.body.weight(.medium))
+                        .foregroundStyle(.primary)
+
+                    if let secondaryText = entrySecondaryText(for: entry) {
+                        Text(secondaryText)
+                            .font(.caption2.italic())
+                            .foregroundStyle(.secondary)
+                    }
                 }
+                .textSelection(.disabled)
+                .frame(maxWidth: .infinity, alignment: .leading)
             }
-            .textSelection(.enabled)
-            .frame(maxWidth: .infinity, alignment: .leading)
+            .frame(maxWidth: .infinity, minHeight: 40, alignment: .leading)
+
+            if isSelected {
+                HStack {
+                    Spacer()
+
+                    Button {
+                        handleDownloadTap(for: entry)
+                    } label: {
+                        HStack(spacing: 8) {
+                            Image(systemName: "arrow.down.circle.fill")
+                            Text("Pobierz")
+                        }
+                        .padding(.horizontal, 14)
+                        .padding(.vertical, 7)
+                    }
+                    .macUSBPrimaryButtonStyle()
+                }
+                .transition(.opacity.combined(with: .move(edge: .top)))
+            }
         }
-        .frame(maxWidth: .infinity, minHeight: 40, alignment: .leading)
         .padding(.horizontal, 12)
         .padding(.vertical, 6)
-        .macUSBPanelSurface(.subtle)
+        .macUSBPanelSurface(isSelected ? .active : .subtle)
+        .overlay(
+            RoundedRectangle(
+                cornerRadius: MacUSBDesignTokens.panelCornerRadius(for: currentVisualMode()),
+                style: .continuous
+            )
+                .stroke(Color.accentColor.opacity(isSelected ? 0.55 : 0), lineWidth: 1.1)
+        )
+        .contentShape(
+            RoundedRectangle(
+                cornerRadius: MacUSBDesignTokens.panelCornerRadius(for: currentVisualMode()),
+                style: .continuous
+            )
+        )
+        .onTapGesture {
+            withAnimation(.easeInOut(duration: 0.18)) {
+                if selectedInstallerID == entry.id {
+                    selectedInstallerID = nil
+                } else {
+                    selectedInstallerID = entry.id
+                }
+            }
+        }
     }
 
     private var visibleFamilyGroups: [MacOSInstallerFamilyGroup] {
@@ -367,6 +474,24 @@ struct MacOSDownloaderWindowView: View {
         }
     }
 
+    private func handleDownloadTap(for entry: MacOSInstallerEntry) {
+        AppLogging.info(
+            "Wybrano opcje pobrania dla \(entry.name) \(entry.version), funkcja pobierania bedzie dodana w Etapie 2.",
+            category: "Downloader"
+        )
+    }
+
+    private func ensureSelectedEntryIsVisible() {
+        guard let selectedInstallerID else { return }
+        let visibleIDs = Set(visibleFamilyGroups.flatMap { group in
+            group.entries.map(\.id)
+        })
+
+        if !visibleIDs.contains(selectedInstallerID) {
+            self.selectedInstallerID = nil
+        }
+    }
+
     private func matchesMajorVersionIconFile(_ fileName: String, majorVersionKey: String, alias: String) -> Bool {
         guard fileName.hasPrefix("os_"), fileName.hasSuffix(".icns") else { return false }
 
@@ -398,52 +523,6 @@ struct MacOSDownloaderWindowView: View {
         .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .topLeading)
     }
 
-    private var discoveryOverlay: some View {
-        ZStack {
-            Color.black.opacity(0.22)
-                .ignoresSafeArea()
-
-            VStack(alignment: .leading, spacing: 14) {
-                HStack(alignment: .center, spacing: 12) {
-                    Image(nsImage: NSApp.applicationIconImage)
-                        .resizable()
-                        .frame(width: 40, height: 40)
-                        .cornerRadius(9)
-
-                    VStack(alignment: .leading, spacing: 2) {
-                        Text("Sprawdzanie wersji macOS")
-                            .font(.headline)
-                        Text("Łączę się z serwerami Apple i wykrywam dostępne instalatory.")
-                            .font(.subheadline)
-                            .foregroundStyle(.secondary)
-                            .fixedSize(horizontal: false, vertical: true)
-                    }
-                }
-
-                ProgressView()
-                    .progressViewStyle(.linear)
-
-                if !logic.statusText.isEmpty {
-                    Text(logic.statusText)
-                        .font(.caption)
-                        .foregroundStyle(.secondary)
-                }
-
-                Button {
-                    logic.cancelDiscovery()
-                } label: {
-                    Text("Anuluj")
-                        .frame(maxWidth: .infinity)
-                        .padding(8)
-                }
-                .macUSBSecondaryButtonStyle()
-            }
-            .padding(16)
-            .frame(width: 420)
-            .macUSBPanelSurface(.neutral)
-            .shadow(color: Color.black.opacity(0.20), radius: 16, x: 0, y: 8)
-        }
-    }
 }
 
 private struct MacOSDownloaderOptionsSheetView: View {
