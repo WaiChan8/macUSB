@@ -172,6 +172,9 @@ private struct MacOSCatalogService {
         static let supportArticleURL = URL(string: "https://support.apple.com/en-us/102662")!
         static let requestTimeout: TimeInterval = 30
         static let byteRangeProbe = "bytes=0-0"
+        static let maxSizeProbeConcurrency = 5
+        static let maxSizeProbeAttempts = 3
+        static let sizeProbeRetryBaseDelayNanoseconds: UInt64 = 400_000_000
         static let downloadableExtensions: Set<String> = ["pkg", "dmg", "ipsw"]
         static let allowedHosts: Set<String> = [
             "swscan.apple.com",
@@ -190,6 +193,61 @@ private struct MacOSCatalogService {
             LegacySupportEntry(label: "Mountain Lion 10.8", name: "OS X Mountain Lion", version: "10.8.5"),
             LegacySupportEntry(label: "Lion 10.7", name: "Mac OS X Lion", version: "10.7.5")
         ]
+    }
+
+    private enum ProbeMethod: String {
+        case head = "HEAD"
+        case range = "RANGE"
+    }
+
+    private struct SizeProbeSummary {
+        let totalEntries: Int
+        let catalogPrefilledSizes: Int
+        let resolvedByNetworkProbe: Int
+        let unresolvedAfterProbe: Int
+        let skippedDueToTrustFailedHost: Int
+        let retriesPerformed: Int
+        let trustFailedHosts: Int
+        let suppressedRepeatedFailureLogs: Int
+    }
+
+    private struct SizeProbeResult {
+        let index: Int
+        let sizeText: String?
+        let retriesPerformed: Int
+        let skippedDueToTrustFailedHost: Int
+    }
+
+    private struct SizeProbeFetchOutcome {
+        let sizeText: String?
+        let retriesPerformed: Int
+        let skippedDueToTrustFailedHost: Int
+    }
+
+    private actor SizeProbeRunState {
+        private var trustFailedHosts: Set<String> = []
+        private var loggedFailureKeys: Set<String> = []
+        private var suppressedRepeatedFailureLogs: Int = 0
+
+        func isTrustFailedHost(_ host: String) -> Bool {
+            trustFailedHosts.contains(host)
+        }
+
+        func markTrustFailedHost(_ host: String) {
+            trustFailedHosts.insert(host)
+        }
+
+        func shouldLogFailure(for key: String) -> Bool {
+            if loggedFailureKeys.insert(key).inserted {
+                return true
+            }
+            suppressedRepeatedFailureLogs += 1
+            return false
+        }
+
+        func summarySnapshot() -> (trustFailedHosts: Int, suppressedRepeatedFailureLogs: Int) {
+            (trustFailedHosts.count, suppressedRepeatedFailureLogs)
+        }
     }
 
     private enum DiscoveryError: LocalizedError {
@@ -242,9 +300,10 @@ private struct MacOSCatalogService {
 
         phase(String(localized: "Sprawdzanie rozmiarów instalatorów..."))
         AppLogging.info("Rozpoczecie sprawdzania rozmiarow instalatorow.", category: "Downloader")
-        let entriesWithSizes = try await enrichedWithInstallerSizes(uniqueEntries)
+        let sizeProbeResult = try await enrichedWithInstallerSizes(uniqueEntries)
         AppLogging.info("Zakonczono sprawdzanie rozmiarow instalatorow.", category: "Downloader")
-        return entriesWithSizes
+        logSizeProbeSummary(sizeProbeResult.summary)
+        return sizeProbeResult.entries
     }
 
     private func parseCatalogCandidates(from data: Data) throws -> [CatalogCandidate] {
@@ -426,62 +485,119 @@ private struct MacOSCatalogService {
         return result
     }
 
-    private func enrichedWithInstallerSizes(_ entries: [MacOSInstallerEntry]) async throws -> [MacOSInstallerEntry] {
-        var enriched: [MacOSInstallerEntry] = []
-        enriched.reserveCapacity(entries.count)
+    private func enrichedWithInstallerSizes(_ entries: [MacOSInstallerEntry]) async throws -> (entries: [MacOSInstallerEntry], summary: SizeProbeSummary) {
+        var enriched = entries
+        let probeState = SizeProbeRunState()
 
-        for entry in entries {
-            try Task.checkCancellation()
-
+        let totalEntries = entries.count
+        let catalogPrefilledSizes = entries.reduce(into: 0) { partialResult, entry in
             if entry.installerSizeText != nil {
-                enriched.append(entry)
-                continue
+                partialResult += 1
             }
-
-            let sizeText: String?
-            do {
-                sizeText = try await fetchInstallerSizeTextIfAvailable(from: entry.sourceURL)
-            } catch is CancellationError {
-                throw CancellationError()
-            } catch {
-                AppLogging.info(
-                    "Nie udalo sie odczytac rozmiaru dla \(entry.sourceURL.absoluteString): \(error.localizedDescription)",
-                    category: "Downloader"
-                )
-                sizeText = nil
-            }
-
-            enriched.append(entry.with(installerSizeText: sizeText))
         }
 
-        return enriched
+        let pendingProbeEntries = entries.enumerated().compactMap { index, entry -> (Int, MacOSInstallerEntry)? in
+            entry.installerSizeText == nil ? (index, entry) : nil
+        }
+
+        var resolvedByNetworkProbe = 0
+        var unresolvedAfterProbe = 0
+        var retriesPerformed = 0
+        var skippedDueToTrustFailedHost = 0
+
+        if !pendingProbeEntries.isEmpty {
+            let maxConcurrency = max(1, Constants.maxSizeProbeConcurrency)
+            var pendingIterator = pendingProbeEntries.makeIterator()
+
+            try await withThrowingTaskGroup(of: SizeProbeResult.self) { group in
+                for _ in 0..<min(maxConcurrency, pendingProbeEntries.count) {
+                    guard let (index, entry) = pendingIterator.next() else { break }
+                    group.addTask {
+                        try await self.probeSize(for: entry, at: index, state: probeState)
+                    }
+                }
+
+                while let result = try await group.next() {
+                    retriesPerformed += result.retriesPerformed
+                    skippedDueToTrustFailedHost += result.skippedDueToTrustFailedHost
+
+                    if let sizeText = result.sizeText {
+                        enriched[result.index] = enriched[result.index].with(installerSizeText: sizeText)
+                        resolvedByNetworkProbe += 1
+                    } else {
+                        unresolvedAfterProbe += 1
+                    }
+
+                    if let (nextIndex, nextEntry) = pendingIterator.next() {
+                        group.addTask {
+                            try await self.probeSize(for: nextEntry, at: nextIndex, state: probeState)
+                        }
+                    }
+                }
+            }
+        }
+
+        let snapshot = await probeState.summarySnapshot()
+        let summary = SizeProbeSummary(
+            totalEntries: totalEntries,
+            catalogPrefilledSizes: catalogPrefilledSizes,
+            resolvedByNetworkProbe: resolvedByNetworkProbe,
+            unresolvedAfterProbe: unresolvedAfterProbe,
+            skippedDueToTrustFailedHost: skippedDueToTrustFailedHost,
+            retriesPerformed: retriesPerformed,
+            trustFailedHosts: snapshot.trustFailedHosts,
+            suppressedRepeatedFailureLogs: snapshot.suppressedRepeatedFailureLogs
+        )
+
+        return (enriched, summary)
     }
 
-    private func fetchInstallerSizeTextIfAvailable(from url: URL) async throws -> String? {
+    private func probeSize(for entry: MacOSInstallerEntry, at index: Int, state: SizeProbeRunState) async throws -> SizeProbeResult {
+        let outcome = try await fetchInstallerSizeTextIfAvailable(from: entry.sourceURL, state: state)
+        return SizeProbeResult(
+            index: index,
+            sizeText: outcome.sizeText,
+            retriesPerformed: outcome.retriesPerformed,
+            skippedDueToTrustFailedHost: outcome.skippedDueToTrustFailedHost
+        )
+    }
+
+    private func fetchInstallerSizeTextIfAvailable(from url: URL, state: SizeProbeRunState) async throws -> SizeProbeFetchOutcome {
         try Task.checkCancellation()
-        guard isAllowedHost(url) else { return nil }
+        guard isAllowedHost(url) else {
+            return SizeProbeFetchOutcome(sizeText: nil, retriesPerformed: 0, skippedDueToTrustFailedHost: 0)
+        }
+
+        var retriesPerformed = 0
+        var skippedDueToTrustFailedHost = 0
 
         for probeURL in sizeProbeURLs(for: url) {
             try Task.checkCancellation()
             guard isAllowedHost(probeURL) else { continue }
-            let bytes: Int64?
-            do {
-                bytes = try await fetchContentLength(from: probeURL)
-            } catch is CancellationError {
-                throw CancellationError()
-            } catch {
-                AppLogging.info(
-                    "Nie udalo sie pobrac naglowkow rozmiaru z \(probeURL.absoluteString): \(error.localizedDescription)",
-                    category: "Downloader"
-                )
+
+            let host = probeURL.host?.lowercased() ?? ""
+            if !host.isEmpty, await state.isTrustFailedHost(host) {
+                skippedDueToTrustFailedHost += 1
                 continue
             }
 
-            guard let bytes, bytes > 0 else { continue }
-            return formatSizeInGigabytes(bytes: bytes)
+            let probeResult = try await fetchContentLengthWithRetry(from: probeURL, state: state)
+            retriesPerformed += probeResult.retriesPerformed
+
+            if let bytes = probeResult.bytes, bytes > 0 {
+                return SizeProbeFetchOutcome(
+                    sizeText: formatSizeInGigabytes(bytes: bytes),
+                    retriesPerformed: retriesPerformed,
+                    skippedDueToTrustFailedHost: skippedDueToTrustFailedHost
+                )
+            }
         }
 
-        return nil
+        return SizeProbeFetchOutcome(
+            sizeText: nil,
+            retriesPerformed: retriesPerformed,
+            skippedDueToTrustFailedHost: skippedDueToTrustFailedHost
+        )
     }
 
     private func isDownloadAssetURL(_ url: URL) -> Bool {
@@ -522,7 +638,42 @@ private struct MacOSCatalogService {
         return result
     }
 
-    private func fetchContentLength(from url: URL) async throws -> Int64? {
+    private func fetchContentLengthWithRetry(from url: URL, state: SizeProbeRunState) async throws -> (bytes: Int64?, retriesPerformed: Int) {
+        var retriesPerformed = 0
+        let attempts = max(1, Constants.maxSizeProbeAttempts)
+
+        for attempt in 1...attempts {
+            do {
+                let bytes = try await fetchContentLength(from: url, state: state)
+                return (bytes, retriesPerformed)
+            } catch is CancellationError {
+                throw CancellationError()
+            } catch {
+                if isTrustFailure(error), let host = url.host?.lowercased(), !host.isEmpty {
+                    await state.markTrustFailedHost(host)
+                    return (nil, retriesPerformed)
+                }
+
+                let shouldRetry = isTransientProbeError(error) && attempt < attempts
+                if shouldRetry {
+                    retriesPerformed += 1
+                    let delay = retryDelayNanoseconds(forAttempt: attempt)
+                    AppLogging.info(
+                        "SizeProbe stage=retry host=\(url.host ?? "unknown") attempt=\(attempt + 1) delay_ms=\(delay / 1_000_000)",
+                        category: "Downloader"
+                    )
+                    try await Task.sleep(nanoseconds: delay)
+                    continue
+                }
+
+                return (nil, retriesPerformed)
+            }
+        }
+
+        return (nil, retriesPerformed)
+    }
+
+    private func fetchContentLength(from url: URL, state: SizeProbeRunState) async throws -> Int64? {
         do {
             if let headLength = try await fetchContentLengthWithHEAD(from: url) {
                 return headLength
@@ -530,10 +681,7 @@ private struct MacOSCatalogService {
         } catch is CancellationError {
             throw CancellationError()
         } catch {
-            AppLogging.info(
-                "HEAD nieudany dla \(url.absoluteString): \(error.localizedDescription)",
-                category: "Downloader"
-            )
+            await logProbeFailure(method: .head, url: url, error: error, action: "fallback_to_range", state: state)
         }
 
         do {
@@ -541,12 +689,90 @@ private struct MacOSCatalogService {
         } catch is CancellationError {
             throw CancellationError()
         } catch {
-            AppLogging.info(
-                "Range probe nieudany dla \(url.absoluteString): \(error.localizedDescription)",
-                category: "Downloader"
-            )
-            return nil
+            await logProbeFailure(method: .range, url: url, error: error, action: "skip_size", state: state)
+            throw error
         }
+    }
+
+    private func logProbeFailure(method: ProbeMethod, url: URL, error: Error, action: String, state: SizeProbeRunState) async {
+        let nsError = error as NSError
+        let host = url.host?.lowercased() ?? "unknown"
+        let streamCode = streamErrorCode(from: nsError)
+        let failureKey = "\(method.rawValue)|\(host)|\(nsError.domain)|\(nsError.code)|\(streamCode ?? 0)"
+
+        guard await state.shouldLogFailure(for: failureKey) else { return }
+
+        let trustFlag = isTrustFailure(error) ? "1" : "0"
+        AppLogging.info(
+            "SizeProbe stage=content_length method=\(method.rawValue) host=\(host) code=\(nsError.code) stream=\(streamCode ?? 0) trust=\(trustFlag) action=\(action) url=\(url.absoluteString)",
+            category: "Downloader"
+        )
+    }
+
+    private func isTransientProbeError(_ error: Error) -> Bool {
+        let nsError = error as NSError
+        guard nsError.domain == NSURLErrorDomain else { return false }
+
+        switch URLError.Code(rawValue: nsError.code) {
+        case .timedOut,
+             .cannotFindHost,
+             .cannotConnectToHost,
+             .dnsLookupFailed,
+             .networkConnectionLost,
+             .notConnectedToInternet,
+             .internationalRoamingOff,
+             .callIsActive,
+             .dataNotAllowed,
+             .resourceUnavailable:
+            return true
+        default:
+            return false
+        }
+    }
+
+    private func isTrustFailure(_ error: Error) -> Bool {
+        let nsError = error as NSError
+        guard nsError.domain == NSURLErrorDomain else { return false }
+
+        switch URLError.Code(rawValue: nsError.code) {
+        case .secureConnectionFailed,
+             .serverCertificateHasBadDate,
+             .serverCertificateUntrusted,
+             .serverCertificateHasUnknownRoot,
+             .serverCertificateNotYetValid,
+             .clientCertificateRejected,
+             .clientCertificateRequired:
+            return true
+        default:
+            return streamErrorCode(from: nsError) == -9802
+        }
+    }
+
+    private func streamErrorCode(from error: NSError) -> Int? {
+        if let value = error.userInfo["_kCFNetworkCFStreamSSLErrorOriginalValue"] as? NSNumber {
+            return value.intValue
+        }
+        if let value = error.userInfo["_kCFStreamErrorCodeKey"] as? NSNumber {
+            return value.intValue
+        }
+        if let underlying = error.userInfo[NSUnderlyingErrorKey] as? NSError {
+            return streamErrorCode(from: underlying)
+        }
+        return nil
+    }
+
+    private func retryDelayNanoseconds(forAttempt attempt: Int) -> UInt64 {
+        let base = Constants.sizeProbeRetryBaseDelayNanoseconds
+        let multiplier = UInt64(1 << max(0, attempt - 1))
+        let jitter = UInt64((attempt * 73) % 170) * 1_000_000
+        return base * multiplier + jitter
+    }
+
+    private func logSizeProbeSummary(_ summary: SizeProbeSummary) {
+        AppLogging.info(
+            "SizeProbe summary total=\(summary.totalEntries) prefilled=\(summary.catalogPrefilledSizes) network=\(summary.resolvedByNetworkProbe) unresolved=\(summary.unresolvedAfterProbe) skipped_failed_host=\(summary.skippedDueToTrustFailedHost) retries=\(summary.retriesPerformed) trust_failed_hosts=\(summary.trustFailedHosts) suppressed_logs=\(summary.suppressedRepeatedFailureLogs)",
+            category: "Downloader"
+        )
     }
 
     private func fetchContentLengthWithHEAD(from url: URL) async throws -> Int64? {
