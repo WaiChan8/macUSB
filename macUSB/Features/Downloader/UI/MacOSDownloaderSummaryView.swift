@@ -64,7 +64,12 @@ extension MacOSDownloaderWindowShellView {
     }
 
     func openPlannedInstallerFolder() {
-        let folderURL = plannedInstallerFolderURL()
+        let folderURL: URL
+        if let finalInstallerAppURL = downloadFlowModel.finalInstallerAppURL {
+            folderURL = finalInstallerAppURL.deletingLastPathComponent()
+        } else {
+            folderURL = plannedInstallerFolderURL()
+        }
         do {
             try FileManager.default.createDirectory(
                 at: folderURL,

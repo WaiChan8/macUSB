@@ -31,6 +31,19 @@ extension MacOSDownloaderWindowShellView {
                     if downloadFlowModel.isFinished {
                         downloadSummaryView
                     } else {
+                        if let failureMessage = downloadFlowModel.failureMessage,
+                           !failureMessage.isEmpty {
+                            StatusCard(tone: .warning, density: .compact) {
+                                VStack(alignment: .leading, spacing: 4) {
+                                    Text("Pobieranie przerwane")
+                                        .font(.subheadline.weight(.semibold))
+                                    Text(failureMessage)
+                                        .font(.caption)
+                                        .foregroundStyle(.secondary)
+                                }
+                            }
+                        }
+
                         downloadStageSectionDivider
 
                         VStack(spacing: 10) {
@@ -97,6 +110,12 @@ extension MacOSDownloaderWindowShellView {
                         Text(downloadStageTitle(for: stage))
                             .font(.headline)
                         Spacer()
+                        if stage == .downloading {
+                            Text(downloadProgressText())
+                                .font(.title3.monospacedDigit())
+                                .fontWeight(.semibold)
+                                .foregroundColor(.accentColor)
+                        }
                     }
 
                     if let description = downloadStageDescription(for: stage) {
@@ -115,13 +134,17 @@ extension MacOSDownloaderWindowShellView {
 
                     if stage == .downloading {
                         HStack {
-                            Text(downloadFlowModel.downloadSpeedText)
-                                .font(.caption.monospacedDigit())
+                            Text(verbatim: downloadSpeedLabelText())
+                                .font(.subheadline.monospacedDigit())
                                 .foregroundStyle(.secondary)
                             Spacer()
                             Text(downloadFlowModel.downloadTransferredText)
                                 .font(.caption.monospacedDigit())
                                 .foregroundStyle(.secondary)
+                        }
+
+                        if !downloadFlowModel.discoveredDownloadItems.isEmpty {
+                            downloadManifestInlineListView
                         }
                     }
                 }
@@ -200,5 +223,46 @@ extension MacOSDownloaderWindowShellView {
         case .cleanup:
             return downloadFlowModel.cleanupProgress
         }
+    }
+
+    func downloadProgressText() -> String {
+        let bounded = min(max(downloadFlowModel.downloadProgress, 0), 1)
+        return "\(Int((bounded * 100).rounded()))%"
+    }
+
+    func downloadSpeedLabelText() -> String {
+        let speed = downloadFlowModel.downloadSpeedText
+            .trimmingCharacters(in: .whitespacesAndNewlines)
+        if speed.isEmpty {
+            return String(localized: "Szybkość pobierania: - MB/s")
+        }
+        return String(
+            format: String(localized: "Szybkość pobierania: %@"),
+            speed
+        )
+    }
+
+    var downloadManifestInlineListView: some View {
+        VStack(alignment: .leading, spacing: 4) {
+            Text("Pliki do pobrania")
+                .font(.caption.weight(.semibold))
+                .foregroundStyle(.secondary)
+
+            ForEach(downloadFlowModel.discoveredDownloadItems) { item in
+                HStack(alignment: .firstTextBaseline, spacing: 8) {
+                    Text(item.name)
+                        .font(.caption2.monospaced())
+                        .lineLimit(1)
+                        .truncationMode(.middle)
+                    Spacer(minLength: 8)
+                    Text(item.expectedSizeText)
+                        .font(.caption2.monospacedDigit())
+                        .foregroundStyle(.secondary)
+                }
+            }
+        }
+        .padding(10)
+        .frame(maxWidth: .infinity, alignment: .leading)
+        .macUSBPanelSurface(.subtle)
     }
 }

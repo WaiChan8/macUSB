@@ -44,10 +44,33 @@ struct HelperWorkflowResultPayload: Codable {
     let isUserCancelled: Bool
 }
 
+struct DownloaderAssemblyRequestPayload: Codable {
+    let packagePath: String
+    let outputDirectoryPath: String
+    let expectedAppName: String
+    let requesterUID: UInt32
+}
+
+struct DownloaderAssemblyProgressPayload: Codable {
+    let workflowID: String
+    let percent: Double
+    let statusText: String
+    let logLine: String?
+}
+
+struct DownloaderAssemblyResultPayload: Codable {
+    let workflowID: String
+    let success: Bool
+    let outputAppPath: String?
+    let errorMessage: String?
+}
+
 @objc(MacUSBPrivilegedHelperToolXPCProtocol)
 protocol PrivilegedHelperToolXPCProtocol {
     func startWorkflow(_ requestData: NSData, reply: @escaping (NSString?, NSError?) -> Void)
     func cancelWorkflow(_ workflowID: String, reply: @escaping (Bool, NSError?) -> Void)
+    func startDownloaderAssembly(_ requestData: NSData, reply: @escaping (NSString?, NSError?) -> Void)
+    func cancelDownloaderAssembly(_ workflowID: String, reply: @escaping (Bool, NSError?) -> Void)
     func queryHealth(_ reply: @escaping (Bool, NSString) -> Void)
 }
 
@@ -55,6 +78,8 @@ protocol PrivilegedHelperToolXPCProtocol {
 protocol PrivilegedHelperClientXPCProtocol {
     func receiveProgressEvent(_ eventData: NSData)
     func finishWorkflow(_ resultData: NSData)
+    func receiveDownloaderAssemblyProgress(_ eventData: NSData)
+    func finishDownloaderAssembly(_ resultData: NSData)
 }
 
 enum HelperXPCCodec {
@@ -1194,16 +1219,264 @@ private final class HelperWorkflowExecutor {
     }
 }
 
+private final class DownloaderAssemblyExecutor {
+    private let request: DownloaderAssemblyRequestPayload
+    private let workflowID: String
+    private let sendProgress: (DownloaderAssemblyProgressPayload) -> Void
+
+    private let stateQueue = DispatchQueue(label: "macUSB.helper.downloaderAssembly.state")
+    private var activeProcess: Process?
+    private var isCancelled = false
+
+    init(
+        request: DownloaderAssemblyRequestPayload,
+        workflowID: String,
+        sendProgress: @escaping (DownloaderAssemblyProgressPayload) -> Void
+    ) {
+        self.request = request
+        self.workflowID = workflowID
+        self.sendProgress = sendProgress
+    }
+
+    func cancel() {
+        stateQueue.sync {
+            isCancelled = true
+            guard let process = activeProcess, process.isRunning else { return }
+            process.terminate()
+            let pid = process.processIdentifier
+            DispatchQueue.global().asyncAfter(deadline: .now() + 5) {
+                if process.isRunning {
+                    kill(pid, SIGKILL)
+                }
+            }
+        }
+    }
+
+    func run() -> DownloaderAssemblyResultPayload {
+        do {
+            try throwIfCancelled()
+            emit(percent: 0.02, status: "Przygotowanie etapu budowania .app")
+
+            let packageURL = URL(fileURLWithPath: request.packagePath)
+            guard FileManager.default.fileExists(atPath: packageURL.path) else {
+                throw NSError(
+                    domain: "macUSBHelper",
+                    code: 404,
+                    userInfo: [NSLocalizedDescriptionKey: "Nie znaleziono InstallAssistant.pkg w sesji pobierania."]
+                )
+            }
+
+            let outputDirectory = URL(fileURLWithPath: request.outputDirectoryPath, isDirectory: true)
+            try FileManager.default.createDirectory(at: outputDirectory, withIntermediateDirectories: true)
+
+            emit(percent: 0.10, status: "Instalacja pakietu InstallAssistant.pkg")
+            let assembledAppURL = try runInstallerAndLocateApp(packageURL: packageURL)
+
+            try throwIfCancelled()
+
+            let destinationURL = outputDirectory.appendingPathComponent(request.expectedAppName, isDirectory: true)
+            if FileManager.default.fileExists(atPath: destinationURL.path) {
+                try FileManager.default.removeItem(at: destinationURL)
+            }
+
+            emit(percent: 0.88, status: "Kopiowanie instalatora .app do katalogu sesji")
+            try runCommand(
+                executable: "/usr/bin/ditto",
+                arguments: [assembledAppURL.path, destinationURL.path]
+            )
+
+            emit(percent: 1.0, status: "Budowanie instalatora .app zakończone")
+            return DownloaderAssemblyResultPayload(
+                workflowID: workflowID,
+                success: true,
+                outputAppPath: destinationURL.path,
+                errorMessage: nil
+            )
+        } catch {
+            let message = (error as NSError).localizedDescription
+            return DownloaderAssemblyResultPayload(
+                workflowID: workflowID,
+                success: false,
+                outputAppPath: nil,
+                errorMessage: message
+            )
+        }
+    }
+
+    private func runInstallerAndLocateApp(packageURL: URL) throws -> URL {
+        let process = Process()
+        process.executableURL = URL(fileURLWithPath: "/usr/sbin/installer")
+        process.arguments = ["-pkg", packageURL.path, "-target", "/", "-verboseR"]
+        let pipe = Pipe()
+        process.standardOutput = pipe
+        process.standardError = pipe
+
+        stateQueue.sync {
+            activeProcess = process
+        }
+
+        try process.run()
+        let handle = pipe.fileHandleForReading
+        var buffer = Data()
+
+        while true {
+            let chunk = handle.availableData
+            if chunk.isEmpty {
+                break
+            }
+            buffer.append(chunk)
+            drainOutputLines(from: &buffer) { [weak self] line in
+                self?.emitInstallerLine(line)
+            }
+            try throwIfCancelled()
+        }
+
+        if !buffer.isEmpty,
+           let tailLine = String(data: buffer, encoding: .utf8)?
+            .trimmingCharacters(in: .whitespacesAndNewlines),
+           !tailLine.isEmpty {
+            emitInstallerLine(tailLine)
+        }
+
+        process.waitUntilExit()
+        stateQueue.sync {
+            activeProcess = nil
+        }
+        try throwIfCancelled()
+
+        guard process.terminationStatus == 0 else {
+            throw NSError(
+                domain: "macUSBHelper",
+                code: Int(process.terminationStatus),
+                userInfo: [NSLocalizedDescriptionKey: "Polecenie installer zakonczone bledem (\(process.terminationStatus))."]
+            )
+        }
+
+        guard let appURL = locateInstalledMontereyApp() else {
+            throw NSError(
+                domain: "macUSBHelper",
+                code: 404,
+                userInfo: [NSLocalizedDescriptionKey: "Nie znaleziono zbudowanej aplikacji instalatora w /Applications."]
+            )
+        }
+
+        return appURL
+    }
+
+    private func locateInstalledMontereyApp() -> URL? {
+        let expectedURL = URL(fileURLWithPath: "/Applications")
+            .appendingPathComponent(request.expectedAppName, isDirectory: true)
+        if FileManager.default.fileExists(atPath: expectedURL.path) {
+            return expectedURL
+        }
+
+        let applicationsURL = URL(fileURLWithPath: "/Applications", isDirectory: true)
+        guard let candidates = try? FileManager.default.contentsOfDirectory(
+            at: applicationsURL,
+            includingPropertiesForKeys: [.contentModificationDateKey],
+            options: [.skipsHiddenFiles]
+        ) else {
+            return nil
+        }
+
+        let installers = candidates.filter { url in
+            let name = url.lastPathComponent.lowercased()
+            return name.hasPrefix("install macos") && name.hasSuffix(".app")
+        }
+
+        return installers.max { lhs, rhs in
+            let lhsDate = (try? lhs.resourceValues(forKeys: [.contentModificationDateKey]).contentModificationDate) ?? .distantPast
+            let rhsDate = (try? rhs.resourceValues(forKeys: [.contentModificationDateKey]).contentModificationDate) ?? .distantPast
+            return lhsDate < rhsDate
+        }
+    }
+
+    private func emitInstallerLine(_ rawLine: String) {
+        let line = rawLine.trimmingCharacters(in: .whitespacesAndNewlines)
+        guard !line.isEmpty else { return }
+
+        if let percent = parseInstallerPercent(from: line) {
+            let normalized = min(max(percent / 100.0, 0), 1)
+            let scaled = 0.10 + (normalized * 0.72)
+            emit(percent: scaled, status: "Instalacja pakietu InstallAssistant.pkg", logLine: line)
+        } else {
+            emit(percent: nil, status: "Instalacja pakietu InstallAssistant.pkg", logLine: line)
+        }
+    }
+
+    private func parseInstallerPercent(from line: String) -> Double? {
+        let pattern = #"([0-9]{1,3}(?:\.[0-9]+)?)\%"#
+        guard let regex = try? NSRegularExpression(pattern: pattern) else { return nil }
+        let nsLine = line as NSString
+        let range = NSRange(location: 0, length: nsLine.length)
+        guard let match = regex.firstMatch(in: line, options: [], range: range),
+              match.numberOfRanges > 1
+        else {
+            return nil
+        }
+        let value = nsLine.substring(with: match.range(at: 1))
+        return Double(value)
+    }
+
+    private func drainOutputLines(from buffer: inout Data, consume: (String) -> Void) {
+        while let newlineRange = buffer.firstRange(of: Data([0x0A])) {
+            let lineData = buffer.subdata(in: 0..<newlineRange.lowerBound)
+            if let line = String(data: lineData, encoding: .utf8) {
+                consume(line)
+            }
+            buffer.removeSubrange(0...newlineRange.lowerBound)
+        }
+    }
+
+    private func runCommand(executable: String, arguments: [String]) throws {
+        let process = Process()
+        process.executableURL = URL(fileURLWithPath: executable)
+        process.arguments = arguments
+        try process.run()
+        process.waitUntilExit()
+        guard process.terminationStatus == 0 else {
+            throw NSError(
+                domain: "macUSBHelper",
+                code: Int(process.terminationStatus),
+                userInfo: [NSLocalizedDescriptionKey: "Polecenie \(executable) zakonczone bledem (\(process.terminationStatus))."]
+            )
+        }
+    }
+
+    private func emit(percent: Double?, status: String, logLine: String? = nil) {
+        let payload = DownloaderAssemblyProgressPayload(
+            workflowID: workflowID,
+            percent: percent ?? 0,
+            statusText: status,
+            logLine: logLine
+        )
+        sendProgress(payload)
+    }
+
+    private func throwIfCancelled() throws {
+        let cancelled = stateQueue.sync { isCancelled }
+        if cancelled {
+            throw NSError(
+                domain: "macUSBHelper",
+                code: NSUserCancelledError,
+                userInfo: [NSLocalizedDescriptionKey: "Operacja budowania instalatora zostala anulowana."]
+            )
+        }
+    }
+}
+
 private final class PrivilegedHelperService: NSObject, PrivilegedHelperToolXPCProtocol {
     weak var connection: NSXPCConnection?
 
     private var activeWorkflowID: String?
     private var activeExecutor: HelperWorkflowExecutor?
+    private var activeDownloaderAssemblyID: String?
+    private var activeDownloaderAssemblyExecutor: DownloaderAssemblyExecutor?
     private let queue = DispatchQueue(label: "macUSB.helper.service")
 
     func startWorkflow(_ requestData: NSData, reply: @escaping (NSString?, NSError?) -> Void) {
         queue.async {
-            guard self.activeExecutor == nil else {
+            guard self.activeExecutor == nil, self.activeDownloaderAssemblyExecutor == nil else {
                 let error = NSError(
                     domain: "macUSBHelper",
                     code: 409,
@@ -1261,6 +1534,69 @@ private final class PrivilegedHelperService: NSObject, PrivilegedHelperToolXPCPr
         }
     }
 
+    func startDownloaderAssembly(_ requestData: NSData, reply: @escaping (NSString?, NSError?) -> Void) {
+        queue.async {
+            guard self.activeExecutor == nil, self.activeDownloaderAssemblyExecutor == nil else {
+                let error = NSError(
+                    domain: "macUSBHelper",
+                    code: 409,
+                    userInfo: [NSLocalizedDescriptionKey: "Helper realizuje już inne zadanie."]
+                )
+                reply(nil, error)
+                return
+            }
+
+            let request: DownloaderAssemblyRequestPayload
+            do {
+                request = try HelperXPCCodec.decode(DownloaderAssemblyRequestPayload.self, from: requestData as Data)
+            } catch {
+                let err = NSError(
+                    domain: "macUSBHelper",
+                    code: 400,
+                    userInfo: [NSLocalizedDescriptionKey: "Nieprawidłowe żądanie assembly downloadera: \(error.localizedDescription)"]
+                )
+                reply(nil, err)
+                return
+            }
+
+            let workflowID = UUID().uuidString
+            let executor = DownloaderAssemblyExecutor(
+                request: request,
+                workflowID: workflowID,
+                sendProgress: { [weak self] event in
+                    self?.sendDownloaderAssemblyProgress(event)
+                }
+            )
+
+            self.activeDownloaderAssemblyID = workflowID
+            self.activeDownloaderAssemblyExecutor = executor
+            reply(workflowID as NSString, nil)
+
+            DispatchQueue.global(qos: .userInitiated).async {
+                let result = executor.run()
+                self.queue.async {
+                    self.sendDownloaderAssemblyResult(result)
+                    self.activeDownloaderAssemblyID = nil
+                    self.activeDownloaderAssemblyExecutor = nil
+                }
+            }
+        }
+    }
+
+    func cancelDownloaderAssembly(_ workflowID: String, reply: @escaping (Bool, NSError?) -> Void) {
+        queue.async {
+            guard self.activeDownloaderAssemblyID == workflowID,
+                  let executor = self.activeDownloaderAssemblyExecutor
+            else {
+                reply(false, nil)
+                return
+            }
+
+            executor.cancel()
+            reply(true, nil)
+        }
+    }
+
     func queryHealth(_ reply: @escaping (Bool, NSString) -> Void) {
         let uid = getuid()
         let euid = geteuid()
@@ -1288,6 +1624,28 @@ private final class PrivilegedHelperService: NSObject, PrivilegedHelperToolXPCPr
             return
         }
         client.finishWorkflow(encoded as NSData)
+    }
+
+    private func sendDownloaderAssemblyProgress(_ event: DownloaderAssemblyProgressPayload) {
+        guard let client = connection?.remoteObjectProxyWithErrorHandler({ _ in }) as? PrivilegedHelperClientXPCProtocol else {
+            return
+        }
+
+        guard let encoded = try? HelperXPCCodec.encode(event) else {
+            return
+        }
+        client.receiveDownloaderAssemblyProgress(encoded as NSData)
+    }
+
+    private func sendDownloaderAssemblyResult(_ result: DownloaderAssemblyResultPayload) {
+        guard let client = connection?.remoteObjectProxyWithErrorHandler({ _ in }) as? PrivilegedHelperClientXPCProtocol else {
+            return
+        }
+
+        guard let encoded = try? HelperXPCCodec.encode(result) else {
+            return
+        }
+        client.finishDownloaderAssembly(encoded as NSData)
     }
 }
 

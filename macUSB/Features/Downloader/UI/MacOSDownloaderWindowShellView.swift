@@ -56,7 +56,10 @@ struct MacOSDownloaderWindowShellView: View {
             }
         }
         .sheet(isPresented: $isOptionsPresented) {
-            MacOSDownloaderOptionsSheetView(showAllAvailableVersions: $showAllAvailableVersions)
+            MacOSDownloaderOptionsSheetView(
+                showAllAvailableVersions: $showAllAvailableVersions,
+                preserveDownloadedFilesInDebug: $downloadFlowModel.preserveDownloadedFilesInDebug
+            )
         }
         .task {
             logic.startDiscovery()
@@ -107,7 +110,9 @@ struct MacOSDownloaderWindowShellView: View {
                 category: "Downloader"
             )
             downloadFlowModel.stop()
-            downloadFlowModel.cleanupTemporaryDownloadsFolder()
+            if !downloadFlowModel.shouldRetainSessionFilesForDebugMode() {
+                downloadFlowModel.cleanupTemporaryDownloadsFolder()
+            }
             activeDownloadEntry = nil
         }
 
@@ -120,7 +125,11 @@ struct MacOSDownloaderWindowShellView: View {
         alert.icon = NSApp.applicationIconImage
         alert.alertStyle = .warning
         alert.messageText = String(localized: "Anulować pobieranie systemu?")
-        alert.informativeText = String(localized: "Jeśli zamkniesz okno teraz, pobieranie zostanie przerwane, a pobrane pliki tymczasowe zostaną usunięte")
+        if downloadFlowModel.shouldRetainSessionFilesForDebugMode() {
+            alert.informativeText = String(localized: "Jeśli zamkniesz okno teraz, pobieranie zostanie przerwane, a pobrane pliki pozostaną w folderze tymczasowym do czasu zamknięcia aplikacji")
+        } else {
+            alert.informativeText = String(localized: "Jeśli zamkniesz okno teraz, pobieranie zostanie przerwane, a pobrane pliki tymczasowe zostaną usunięte")
+        }
         alert.addButton(withTitle: String(localized: "Kontynuuj pobieranie"))
         alert.addButton(withTitle: String(localized: "Anuluj pobieranie i zamknij"))
         return alert.runModal() == .alertSecondButtonReturn
@@ -145,17 +154,17 @@ struct MacOSDownloaderWindowShellView: View {
     func handleDownloadTap(for entry: MacOSInstallerEntry) {
         guard supportsMontereyPlaceholderDownload(entry) else {
             AppLogging.info(
-                "Placeholder pobierania jest obecnie dostepny tylko dla macOS Monterey.",
+                "Pobieranie jest obecnie dostepne tylko dla macOS Monterey.",
                 category: "Downloader"
             )
             return
         }
 
         activeDownloadEntry = entry
-        downloadFlowModel.start(for: entry)
+        downloadFlowModel.start(for: entry, using: logic)
 
         AppLogging.info(
-            "Uruchomiono placeholder widoku pobierania dla \(entry.name) \(entry.version).",
+            "Uruchomiono pobieranie Monterey dla \(entry.name) \(entry.version).",
             category: "Downloader"
         )
     }
@@ -197,6 +206,7 @@ struct MacOSDownloaderWindowShellView: View {
 
 private struct MacOSDownloaderOptionsSheetView: View {
     @Binding var showAllAvailableVersions: Bool
+    @Binding var preserveDownloadedFilesInDebug: Bool
     @Environment(\.dismiss) private var dismiss
 
     var body: some View {
@@ -206,6 +216,11 @@ private struct MacOSDownloaderOptionsSheetView: View {
 
             Toggle("Pokaż wszystkie dostępne wersje", isOn: $showAllAvailableVersions)
                 .toggleStyle(.checkbox)
+
+            #if DEBUG
+            Toggle("DEBUG: Nie usuwaj pobranych plików", isOn: $preserveDownloadedFilesInDebug)
+                .toggleStyle(.checkbox)
+            #endif
 
             Spacer(minLength: 0)
 
@@ -222,6 +237,6 @@ private struct MacOSDownloaderOptionsSheetView: View {
             }
         }
         .padding(18)
-        .frame(width: 360, height: 170)
+        .frame(width: 420, height: 210)
     }
 }

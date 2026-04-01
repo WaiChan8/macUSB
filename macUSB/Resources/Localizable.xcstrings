@@ -1762,6 +1762,9 @@
         }
       }
     },
+    "Analiza listy plików i metadanych..." : {
+
+    },
     "Analiza metadanych wersji..." : {
 
     },
@@ -7377,6 +7380,9 @@
         }
       }
     },
+    "Jeśli zamkniesz okno teraz, pobieranie zostanie przerwane, a pobrane pliki pozostaną w folderze tymczasowym do czasu zamknięcia aplikacji" : {
+
+    },
     "Jeśli zamkniesz okno teraz, pobieranie zostanie przerwane, a pobrane pliki tymczasowe zostaną usunięte" : {
 
     },
@@ -12039,7 +12045,16 @@
         }
       }
     },
+    "Pliki do pobrania" : {
+
+    },
     "Pobieranie katalogu Apple..." : {
+
+    },
+    "Pobieranie manifestu Monterey..." : {
+
+    },
+    "Pobieranie przerwane" : {
 
     },
     "Pobieranie systemu" : {
@@ -15956,6 +15971,12 @@
         }
       }
     },
+    "Szybkość pobierania: - MB/s" : {
+
+    },
+    "Szybkość pobierania: %@" : {
+
+    },
     "Szybkość zapisu: - MB/s" : {
       "localizations" : {
         "de" : {
@@ -17571,6 +17592,9 @@
           }
         }
       }
+    },
+    "Ustalanie rozmiarów plików..." : {
+
     },
     "Ustawienia działania w tle…" : {
       "localizations" : {

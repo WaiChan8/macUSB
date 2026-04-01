@@ -2,22 +2,54 @@ import Foundation
 import AppKit
 
 extension MontereyDownloadPlaceholderFlowModel {
-    func runCleanup() async throws {
+    enum CleanupCompletionReason {
+        case success
+        case failed
+        case cancelled
+    }
+
+    func runCleanup(completionReason: CleanupCompletionReason) async throws {
         currentStage = .cleanup
-        cleanupStatusText = "Usuwanie plików tymczasowych sesji..."
         cleanupProgress = 0
 
-        for step in 1...4 {
-            try await Task.sleep(nanoseconds: 450_000_000)
-            try Task.checkCancellation()
-            cleanupProgress = Double(step) / 4.0
+        if shouldRetainSessionFilesForDebugMode() {
+            switch completionReason {
+            case .success:
+                cleanupStatusText = "Tryb DEBUG: pliki sesji pozostawiono po sukcesie..."
+            case .failed:
+                cleanupStatusText = "Tryb DEBUG: pliki sesji pozostawiono po błędzie..."
+            case .cancelled:
+                cleanupStatusText = "Tryb DEBUG: pliki sesji pozostawiono po anulowaniu..."
+            }
+            cleanupProgress = 1
+            completedStages.insert(.cleanup)
+            return
         }
 
-        cleanupProgress = 1.0
-        completedStages.insert(.cleanup)
+        guard let activeSessionRootURL else {
+            cleanupStatusText = "Brak plików tymczasowych do usunięcia..."
+            cleanupProgress = 1
+            completedStages.insert(.cleanup)
+            return
+        }
+
+        cleanupStatusText = "Usuwanie plików tymczasowych sesji..."
+        cleanupProgress = 0.2
+
+        do {
+            if FileManager.default.fileExists(atPath: activeSessionRootURL.path) {
+                try FileManager.default.removeItem(at: activeSessionRootURL)
+            }
+            cleanupProgress = 1
+            completedStages.insert(.cleanup)
+            cleanupStatusText = "Pliki tymczasowe zostały usunięte..."
+        } catch {
+            throw DownloadFailureReason.cleanupFailed(error.localizedDescription)
+        }
     }
 
     func updateSummaryMetrics() {
+        let totalDownloadedGB = Double(totalDownloadedBytes) / 1_000_000_000
         summaryTotalDownloadedText = "\(formatDecimal(totalDownloadedGB, fractionDigits: 1)) GB"
 
         let averageSpeed = speedSamplesMBps.isEmpty
@@ -69,9 +101,7 @@ extension MontereyDownloadPlaceholderFlowModel {
     }
 
     func cleanupTemporaryDownloadsFolder() {
-        let temporaryDownloadsURL = FileManager.default.temporaryDirectory
-            .appendingPathComponent("macUSB_temp", isDirectory: true)
-            .appendingPathComponent("downloads", isDirectory: true)
+        let temporaryDownloadsURL = downloaderSessionsRootURL()
 
         guard FileManager.default.fileExists(atPath: temporaryDownloadsURL.path) else {
             AppLogging.info(

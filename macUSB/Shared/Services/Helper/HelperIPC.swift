@@ -113,10 +113,33 @@ struct HelperWorkflowResultPayload: Codable {
     let isUserCancelled: Bool
 }
 
+struct DownloaderAssemblyRequestPayload: Codable {
+    let packagePath: String
+    let outputDirectoryPath: String
+    let expectedAppName: String
+    let requesterUID: UInt32
+}
+
+struct DownloaderAssemblyProgressPayload: Codable {
+    let workflowID: String
+    let percent: Double
+    let statusText: String
+    let logLine: String?
+}
+
+struct DownloaderAssemblyResultPayload: Codable {
+    let workflowID: String
+    let success: Bool
+    let outputAppPath: String?
+    let errorMessage: String?
+}
+
 @objc(MacUSBPrivilegedHelperToolXPCProtocol)
 protocol PrivilegedHelperToolXPCProtocol {
     func startWorkflow(_ requestData: NSData, reply: @escaping (NSString?, NSError?) -> Void)
     func cancelWorkflow(_ workflowID: String, reply: @escaping (Bool, NSError?) -> Void)
+    func startDownloaderAssembly(_ requestData: NSData, reply: @escaping (NSString?, NSError?) -> Void)
+    func cancelDownloaderAssembly(_ workflowID: String, reply: @escaping (Bool, NSError?) -> Void)
     func queryHealth(_ reply: @escaping (Bool, NSString) -> Void)
 }
 
@@ -124,6 +147,8 @@ protocol PrivilegedHelperToolXPCProtocol {
 protocol PrivilegedHelperClientXPCProtocol {
     func receiveProgressEvent(_ eventData: NSData)
     func finishWorkflow(_ resultData: NSData)
+    func receiveDownloaderAssemblyProgress(_ eventData: NSData)
+    func finishDownloaderAssembly(_ resultData: NSData)
 }
 
 enum HelperXPCCodec {

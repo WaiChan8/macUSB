@@ -10,6 +10,7 @@ struct MacOSInstallerEntry: Identifiable, Hashable {
     let build: String
     let installerSizeText: String?
     let sourceURL: URL
+    let catalogProductID: String?
 
     var displayTitle: String {
         "\(name) \(version) (\(build))"
@@ -23,7 +24,8 @@ struct MacOSInstallerEntry: Identifiable, Hashable {
             version: version,
             build: build,
             installerSizeText: installerSizeText,
-            sourceURL: sourceURL
+            sourceURL: sourceURL,
+            catalogProductID: catalogProductID
         )
     }
 }
@@ -86,6 +88,13 @@ final class MacOSDownloaderLogic: ObservableObject {
             statusText = ""
             AppLogging.info("Anulowano sprawdzanie dostepnych wersji systemow.", category: "Downloader")
         }
+    }
+
+    func prepareDownloadManifest(
+        for entry: MacOSInstallerEntry,
+        phase: @escaping @Sendable (String) -> Void
+    ) async throws -> DownloadManifest {
+        try await catalogService.fetchDownloadManifest(for: entry, phase: phase)
     }
 
     private func runDiscovery() async {
@@ -156,6 +165,7 @@ private struct MacOSCatalogService {
     typealias PhaseSink = @Sendable (String) -> Void
 
     private struct CatalogCandidate {
+        let productID: String
         let distributionURL: URL
         let sourceURL: URL
         let catalogSizeBytes: Int64?
@@ -224,6 +234,15 @@ private struct MacOSCatalogService {
         let skippedDueToTrustFailedHost: Int
     }
 
+    private struct CatalogPackageDescriptor {
+        let name: String
+        let url: URL
+        let sizeBytes: Int64?
+        let digest: String?
+        let digestAlgorithm: String?
+        let integrityDataURL: URL?
+    }
+
     private actor SizeProbeRunState {
         private var trustFailedHosts: Set<String> = []
         private var loggedFailureKeys: Set<String> = []
@@ -254,6 +273,9 @@ private struct MacOSCatalogService {
         case blockedHost(URL)
         case invalidResponse(URL)
         case invalidCatalogFormat
+        case productNotFound(String)
+        case unsupportedEntry
+        case emptyDownloadManifest
 
         var errorDescription: String? {
             switch self {
@@ -263,6 +285,12 @@ private struct MacOSCatalogService {
                 return "Niepoprawna odpowiedz serwera dla: \(url.absoluteString)"
             case .invalidCatalogFormat:
                 return "Nie udalo sie sparsowac katalogu Apple."
+            case let .productNotFound(productID):
+                return "Nie znaleziono produktu \(productID) w katalogu Apple."
+            case .unsupportedEntry:
+                return "Wybrana pozycja nie jest wspierana w aktualnym przeplywie pobierania."
+            case .emptyDownloadManifest:
+                return "Katalog Apple nie zwrocil plikow do pobrania."
             }
         }
     }
@@ -306,19 +334,96 @@ private struct MacOSCatalogService {
         return sizeProbeResult.entries
     }
 
-    private func parseCatalogCandidates(from data: Data) throws -> [CatalogCandidate] {
+    func fetchDownloadManifest(
+        for entry: MacOSInstallerEntry,
+        phase: @escaping PhaseSink
+    ) async throws -> DownloadManifest {
+        try Task.checkCancellation()
+
+        let majorVersion = entry.version.split(separator: ".").first.map(String.init) ?? ""
+        let isMonterey = majorVersion == "12" || entry.name.lowercased().contains("monterey")
+        guard isMonterey else {
+            throw DiscoveryError.unsupportedEntry
+        }
+        guard let productID = entry.catalogProductID, !productID.isEmpty else {
+            throw DiscoveryError.unsupportedEntry
+        }
+
+        phase(String(localized: "Pobieranie manifestu Monterey..."))
+        let catalogData = try await fetchData(from: Constants.catalogURL)
+        let products = try parseCatalogProducts(from: catalogData)
+        guard let product = products[productID] else {
+            throw DiscoveryError.productNotFound(productID)
+        }
+
+        phase(String(localized: "Analiza listy plików i metadanych..."))
+        var descriptors = packageDescriptors(from: product)
+        descriptors = descriptors.filter { descriptor in
+            isAllowedHost(descriptor.url) && isDownloadAssetURL(descriptor.url)
+        }
+        guard !descriptors.isEmpty else {
+            throw DiscoveryError.emptyDownloadManifest
+        }
+
+        phase(String(localized: "Ustalanie rozmiarów plików..."))
+        let probeState = SizeProbeRunState()
+        var manifestItems: [DownloadManifestItem] = []
+        manifestItems.reserveCapacity(descriptors.count)
+        var totalExpectedBytes: Int64 = 0
+
+        for (index, descriptor) in descriptors.enumerated() {
+            try Task.checkCancellation()
+
+            var expectedSizeBytes = descriptor.sizeBytes
+            if expectedSizeBytes == nil || expectedSizeBytes == 0 {
+                let result = try await fetchContentLengthWithRetry(from: descriptor.url, state: probeState)
+                expectedSizeBytes = result.bytes
+            }
+
+            guard let resolvedSizeBytes = expectedSizeBytes, resolvedSizeBytes > 0 else {
+                throw DiscoveryError.invalidResponse(descriptor.url)
+            }
+
+            let item = DownloadManifestItem(
+                order: index,
+                name: descriptor.name,
+                url: descriptor.url,
+                expectedSizeBytes: resolvedSizeBytes,
+                expectedDigest: descriptor.digest,
+                digestAlgorithm: descriptor.digestAlgorithm,
+                integrityDataURL: descriptor.integrityDataURL
+            )
+            manifestItems.append(item)
+            totalExpectedBytes += resolvedSizeBytes
+        }
+
+        return DownloadManifest(
+            productID: productID,
+            systemName: entry.name,
+            systemVersion: entry.version,
+            systemBuild: entry.build,
+            items: manifestItems,
+            totalExpectedBytes: totalExpectedBytes
+        )
+    }
+
+    private func parseCatalogProducts(from data: Data) throws -> [String: [String: Any]] {
         guard
             let plist = try PropertyListSerialization.propertyList(from: data, options: [], format: nil) as? [String: Any],
-            let products = plist["Products"] as? [String: Any]
+            let products = plist["Products"] as? [String: [String: Any]]
         else {
             throw DiscoveryError.invalidCatalogFormat
         }
+        return products
+    }
+
+    private func parseCatalogCandidates(from data: Data) throws -> [CatalogCandidate] {
+        let products = try parseCatalogProducts(from: data)
 
         var candidates: [CatalogCandidate] = []
         candidates.reserveCapacity(products.count)
 
-        for value in products.values {
-            guard let product = value as? [String: Any] else { continue }
+        for (productID, product) in products {
             guard
                 let extendedMeta = product["ExtendedMetaInfo"] as? [String: Any],
                 extendedMeta["InstallAssistantPackageIdentifiers"] != nil
@@ -333,10 +438,12 @@ private struct MacOSCatalogService {
                 continue
             }
 
-            let sourceURL = preferredInstallAssistantPackageURL(from: product) ?? distributionURL
-            let catalogSizeBytes = summedPackageSize(from: product)
+            let packageDescriptors = packageDescriptors(from: product)
+            let sourceURL = preferredInstallAssistantPackageURL(from: packageDescriptors) ?? distributionURL
+            let catalogSizeBytes = summedPackageSize(from: packageDescriptors)
             candidates.append(
                 CatalogCandidate(
+                    productID: productID,
                     distributionURL: distributionURL,
                     sourceURL: sourceURL,
                     catalogSizeBytes: catalogSizeBytes
@@ -365,44 +472,89 @@ private struct MacOSCatalogService {
         return nil
     }
 
-    private func preferredInstallAssistantPackageURL(from product: [String: Any]) -> URL? {
-        guard let packages = product["Packages"] as? [[String: Any]] else { return nil }
-
-        for package in packages {
-            guard let urlString = package["URL"] as? String else { continue }
-            guard urlString.localizedCaseInsensitiveContains("InstallAssistant") else { continue }
-            guard let url = URL(string: urlString) else { continue }
-            return url
+    private func preferredInstallAssistantPackageURL(from descriptors: [CatalogPackageDescriptor]) -> URL? {
+        for descriptor in descriptors {
+            if descriptor.name.localizedCaseInsensitiveContains("InstallAssistant") {
+                return descriptor.url
+            }
         }
-
         return nil
     }
 
-    private func summedPackageSize(from product: [String: Any]) -> Int64? {
-        guard let packages = product["Packages"] as? [[String: Any]], !packages.isEmpty else {
+    private func summedPackageSize(from descriptors: [CatalogPackageDescriptor]) -> Int64? {
+        guard !descriptors.isEmpty else {
             return nil
         }
 
         var totalBytes: Int64 = 0
-        for package in packages {
-            if let value = package["Size"] as? NSNumber {
-                totalBytes += max(0, value.int64Value)
-                continue
-            }
-            if let value = package["Size"] as? Int64 {
-                totalBytes += max(0, value)
-                continue
-            }
-            if let value = package["Size"] as? Int {
-                totalBytes += max(0, Int64(value))
-                continue
-            }
-            if let value = package["Size"] as? String, let parsed = Int64(value) {
-                totalBytes += max(0, parsed)
+        for descriptor in descriptors {
+            if let sizeBytes = descriptor.sizeBytes {
+                totalBytes += max(0, sizeBytes)
             }
         }
 
         return totalBytes > 0 ? totalBytes : nil
+    }
+
+    private func packageDescriptors(from product: [String: Any]) -> [CatalogPackageDescriptor] {
+        guard let packages = product["Packages"] as? [[String: Any]] else {
+            return []
+        }
+
+        var descriptors: [CatalogPackageDescriptor] = []
+        descriptors.reserveCapacity(packages.count)
+
+        for package in packages {
+            guard
+                let urlString = package["URL"] as? String,
+                let url = URL(string: urlString)
+            else {
+                continue
+            }
+
+            let integrityURL: URL?
+            if let integrityString = package["IntegrityDataURL"] as? String {
+                integrityURL = URL(string: integrityString)
+            } else {
+                integrityURL = nil
+            }
+
+            let descriptor = CatalogPackageDescriptor(
+                name: packageDisplayName(for: url),
+                url: url,
+                sizeBytes: parseInt64(from: package["Size"]),
+                digest: (package["Digest"] as? String)?.trimmingCharacters(in: .whitespacesAndNewlines),
+                digestAlgorithm: (package["DigestAlgorithm"] as? String)?.trimmingCharacters(in: .whitespacesAndNewlines),
+                integrityDataURL: integrityURL
+            )
+            descriptors.append(descriptor)
+        }
+
+        return descriptors
+    }
+
+    private func packageDisplayName(for url: URL) -> String {
+        let lastComponent = url.lastPathComponent
+        if !lastComponent.isEmpty {
+            return lastComponent
+        }
+        return url.absoluteString
+    }
+
+    private func parseInt64(from value: Any?) -> Int64? {
+        if let number = value as? NSNumber {
+            return number.int64Value
+        }
+        if let intValue = value as? Int64 {
+            return intValue
+        }
+        if let intValue = value as? Int {
+            return Int64(intValue)
+        }
+        if let stringValue = value as? String, let intValue = Int64(stringValue) {
+            return intValue
+        }
+        return nil
     }
 
     private func parseDistributionCandidate(_ candidate: CatalogCandidate) async throws -> MacOSInstallerEntry? {
@@ -429,7 +581,8 @@ private struct MacOSCatalogService {
             version: version,
             build: build,
             installerSizeText: candidate.catalogSizeBytes.map(formatSizeInGigabytes),
-            sourceURL: candidate.sourceURL
+            sourceURL: candidate.sourceURL,
+            catalogProductID: candidate.productID
         )
     }
 
@@ -462,7 +615,8 @@ private struct MacOSCatalogService {
                     version: legacy.version,
                     build: "N/A",
                     installerSizeText: nil,
-                    sourceURL: sourceURL
+                    sourceURL: sourceURL,
+                    catalogProductID: nil
                 )
             )
         }
