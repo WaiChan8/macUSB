@@ -216,6 +216,13 @@ Minor helper changes that do not alter behavior may proceed, but must still be r
 - Avoid duplicating the same rule in multiple files.
 - Keep links and file paths current after any rename or restructure.
 
+## Code structure hygiene
+
+- When adding new features, prefer creating new files/modules instead of extending an unrelated large file when this improves readability, reviewability, and safety.
+- When extending an existing feature and the code grows materially, proactively suggest and (when accepted) perform a split into smaller focused files.
+- Keep one clear orchestrator per workflow and move helper policies/utilities/IO/details to focused companion files.
+- Treat structural refactors as behavior-preserving by default (no runtime/UI changes unless explicitly requested).
+
 ## Branch naming convention
 
 When branch creation is requested:

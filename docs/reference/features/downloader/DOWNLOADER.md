@@ -94,7 +94,7 @@ Process runtime state:
 
 ## 5. Discovery Flow (Apple Catalog)
 
-Discovery pipeline (`MacOSDiscoveryLogic`):
+Discovery pipeline (`MacOSCatalogService`, orchestrated by `MacOSDownloaderLogic`):
 1. Download Apple catalog (`swscan.apple.com`).
 2. Parse InstallAssistant candidates from products metadata.
 3. Parse `.dist` metadata from Apple distribution hosts.
@@ -261,10 +261,10 @@ Downloader module:
 - `macUSB/Features/Downloader/UI/MacOSDownloaderListView.swift`
 - `macUSB/Features/Downloader/UI/MacOSDownloaderProcessView.swift`
 - `macUSB/Features/Downloader/UI/MacOSDownloaderSummaryView.swift`
-- `macUSB/Features/Downloader/Logic/MacOSDiscoveryLogic.swift`
-- `macUSB/Features/Downloader/Logic/MacOSDownloadLogic.swift`
+- `macUSB/Features/Downloader/Logic/Discovery/*`
+- `macUSB/Features/Downloader/Logic/Download/*`
 - `macUSB/Features/Downloader/Logic/MacOSVerificationLogic.swift`
-- `macUSB/Features/Downloader/Logic/MacOSAssemblyLogic.swift`
+- `macUSB/Features/Downloader/Logic/Assembly/*`
 - `macUSB/Features/Downloader/Logic/MacOSCleanupLogic.swift`
 
 Helper touchpoints:

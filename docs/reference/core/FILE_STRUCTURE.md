@@ -17,7 +17,11 @@
 
 - `macUSB/Features/Downloader/MacOSDownloaderCoordinator.swift`
 - `macUSB/Features/Downloader/UI/*`
-- `macUSB/Features/Downloader/Logic/*`
+- `macUSB/Features/Downloader/Logic/Discovery/*`
+- `macUSB/Features/Downloader/Logic/Download/*`
+- `macUSB/Features/Downloader/Logic/Assembly/*`
+- `macUSB/Features/Downloader/Logic/MacOSVerificationLogic.swift`
+- `macUSB/Features/Downloader/Logic/MacOSCleanupLogic.swift`
 
 ### Helper (app-side)
 
