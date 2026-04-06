@@ -73,11 +73,15 @@ extension MacOSDownloaderWindowShellView {
                         }
                     }
                 }
-                .padding(MacUSBDesignTokens.panelInnerPadding)
                 .frame(maxWidth: .infinity, alignment: .leading)
             }
+            .padding(MacUSBDesignTokens.panelInnerPadding)
             .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .topLeading)
             .macUSBPanelSurface(.neutral)
+            .clipped()
+#if swift(>=5.9)
+            .scrollIndicators(.hidden)
+#endif
         }
     }
 
