@@ -218,10 +218,29 @@ extension MacOSDownloaderWindowShellView {
         case .verifying:
             return "Weryfikowanie plików - \(downloadFlowModel.verifyCurrentIndex)/\(downloadFlowModel.verifyTotal)"
         case .buildingInstaller:
-            return "Budowanie instalatora macOS"
+            return "Budowanie instalatora \(installerFamilyLabelForBuildStage())"
         case .cleanup:
             return "Czyszczenie plików tymczasowych"
         }
+    }
+
+    private func installerFamilyLabelForBuildStage() -> String {
+        guard let entry = activeDownloadEntry else {
+            return "macOS"
+        }
+        let parts = entry.version.split(separator: ".")
+        guard let major = parts.first.flatMap({ Int($0) }) else {
+            return "macOS"
+        }
+        let minor = parts.dropFirst().first.flatMap { Int($0) } ?? -1
+
+        if major == 10, minor == 7 {
+            return "Mac OS X"
+        }
+        if major == 10, (8...11).contains(minor) {
+            return "OS X"
+        }
+        return "macOS"
     }
 
     func downloadStageDescription(for stage: MontereyDownloadFlowStage) -> String? {

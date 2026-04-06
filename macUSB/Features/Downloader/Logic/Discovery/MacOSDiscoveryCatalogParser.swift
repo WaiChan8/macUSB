@@ -44,6 +44,10 @@ extension MacOSCatalogService {
     ) async throws -> DownloadManifest {
         try Task.checkCancellation()
 
+        if isOldestInstallerTarget(entry) {
+            return try await fetchOldestDownloadManifest(for: entry, phase: phase)
+        }
+
         let majorVersion = entry.version.split(separator: ".").first.map(String.init) ?? ""
         let normalizedName = entry.name.lowercased()
         let supportedMajors: Set<String> = ["11", "12", "13", "14", "15", "26"]
@@ -127,6 +131,62 @@ extension MacOSCatalogService {
             distributionURL: distributionURL,
             items: manifestItems,
             totalExpectedBytes: totalExpectedBytes
+        )
+    }
+
+    private func fetchOldestDownloadManifest(
+        for entry: MacOSInstallerEntry,
+        phase: @escaping PhaseSink
+    ) async throws -> DownloadManifest {
+        guard entry.sourceURL.pathExtension.lowercased() == "dmg", isAllowedHost(entry.sourceURL) else {
+            throw DiscoveryError.unsupportedEntry
+        }
+
+        phase(String(localized: "Przygotowanie manifestu dla najstarszego systemu..."))
+        let probeState = SizeProbeRunState()
+        let candidateURLs = sizeProbeURLs(for: entry.sourceURL)
+        var selectedURL: URL?
+        var resolvedSizeBytes: Int64?
+
+        for candidateURL in candidateURLs {
+            try Task.checkCancellation()
+            guard isAllowedHost(candidateURL) else { continue }
+
+            let sizeResult = try await fetchContentLengthWithRetry(from: candidateURL, state: probeState)
+            if let bytes = sizeResult.bytes, bytes > 0 {
+                selectedURL = candidateURL
+                resolvedSizeBytes = bytes
+                break
+            }
+        }
+
+        guard let finalSourceURL = selectedURL, let finalSizeBytes = resolvedSizeBytes, finalSizeBytes > 0 else {
+            throw DiscoveryError.invalidResponse(entry.sourceURL)
+        }
+        AppLogging.info(
+            "Oldest manifest source selected: original=\(entry.sourceURL.absoluteString), final=\(finalSourceURL.absoluteString), size=\(finalSizeBytes)",
+            category: "Downloader"
+        )
+
+        let item = DownloadManifestItem(
+            order: 0,
+            name: packageDisplayName(for: finalSourceURL),
+            url: finalSourceURL,
+            packageIdentifier: nil,
+            expectedSizeBytes: finalSizeBytes,
+            expectedDigest: nil,
+            digestAlgorithm: nil,
+            integrityDataURL: nil
+        )
+
+        return DownloadManifest(
+            productID: entry.catalogProductID ?? "legacy-support-\(entry.version)",
+            systemName: entry.name,
+            systemVersion: entry.version,
+            systemBuild: entry.build,
+            distributionURL: nil,
+            items: [item],
+            totalExpectedBytes: finalSizeBytes
         )
     }
 

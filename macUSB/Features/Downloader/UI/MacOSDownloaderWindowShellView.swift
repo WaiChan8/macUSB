@@ -150,6 +150,10 @@ struct MacOSDownloaderWindowShellView: View {
     }
 
     func supportsProductionDownload(_ entry: MacOSInstallerEntry) -> Bool {
+        if logic.isOldestDownloadTarget(entry) {
+            return true
+        }
+
         let normalizedName = entry.name.lowercased()
         let major = entry.version.split(separator: ".").first.map(String.init) ?? ""
         let supportedMajors: Set<String> = ["11", "12", "13", "14", "15", "26"]

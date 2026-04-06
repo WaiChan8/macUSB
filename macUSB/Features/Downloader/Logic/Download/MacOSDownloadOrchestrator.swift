@@ -11,7 +11,7 @@ extension MontereyDownloadFlowModel {
 
             try prepareSessionDirectories()
             try await runFileDownloads(manifest: manifest)
-            try await runFileVerification(manifest: manifest)
+            try await runFileVerification(manifest: manifest, entry: entry)
             try await runInstallerBuild(manifest: manifest, entry: entry)
             try await runCleanup(completionReason: .success)
 
