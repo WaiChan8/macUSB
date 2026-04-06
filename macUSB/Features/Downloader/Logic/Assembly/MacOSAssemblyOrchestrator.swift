@@ -13,7 +13,7 @@ extension MontereyDownloadFlowModel {
         entry: MacOSInstallerEntry
     ) async throws {
         currentStage = .buildingInstaller
-        buildStatusText = "Przygotowuję budowanie instalatora..."
+        buildStatusText = "Przygotowywanie instalatora..."
         buildProgress = 0
 
         let assemblySelection = try resolveAssemblyInput(in: manifest)
@@ -48,7 +48,7 @@ extension MontereyDownloadFlowModel {
             expectedBuild: entry.build,
             expectedVersion: entry.version
         )
-        buildStatusText = "Instalator .app został zbudowany w /Applications..."
+        buildStatusText = "Instalator został przygotowany"
         buildProgress = 1.0
         completedStages.insert(.buildingInstaller)
 

@@ -10,7 +10,7 @@ extension MacOSCatalogService {
         let candidates = try parseCatalogCandidates(from: catalogData)
         AppLogging.info("W katalogu znaleziono \(candidates.count) kandydatow InstallAssistant.", category: "Downloader")
 
-        phase(String(localized: "Analiza metadanych wersji..."))
+        phase(String(localized: "Analizowanie metadanych wersji..."))
         AppLogging.info("Rozpoczecie parsowania plikow .dist.", category: "Downloader")
         var entries: [MacOSInstallerEntry] = []
         entries.reserveCapacity(candidates.count + Constants.legacySupportMap.count)
@@ -22,7 +22,7 @@ extension MacOSCatalogService {
             }
         }
 
-        phase(String(localized: "Dołączanie starszych wersji z Apple Support..."))
+        phase(String(localized: "Dołączanie starszych wersji..."))
         AppLogging.info("Dolaczanie starszych wpisow z Apple Support.", category: "Downloader")
         let legacyEntries = try await fetchLegacySupportEntries()
         entries.append(contentsOf: legacyEntries)
@@ -85,6 +85,8 @@ extension MacOSCatalogService {
         }
         if isLegacyAssemblyTarget(entry) {
             descriptors = filterLegacyAssemblyDescriptors(descriptors)
+        } else {
+            descriptors = filterModernAssemblyDescriptors(descriptors)
         }
         guard !descriptors.isEmpty else {
             throw DiscoveryError.emptyDownloadManifest

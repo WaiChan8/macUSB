@@ -1,13 +1,12 @@
 # macUSB Release Changelog
 
-## v2.1
+## Unreleased
 
-This release makes helper repair more dependable and expands downloader compatibility for Apple’s oldest macOS installers distributed as disk images.
+This release improves helper repair reliability and user guidance during recovery paths.
 
 ### IMPROVEMENTS
 - Helper repair is now more reliable and repeatable, especially in cases where macOS temporarily blocks or delays background activation, with more stable recovery after reconnection attempts.
 - The helper repair window has been redesigned to better match the app style, with clearer status messages and a cleaner, easier-to-follow layout.
-- Downloader now supports Apple Support installers for macOS Sierra and older systems with `.dmg` download flow, embedded `.pkg` signature verification, installer app assembly, and standard temp cleanup.
 
 ---
 

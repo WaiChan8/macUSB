@@ -114,7 +114,7 @@ extension MontereyDownloadFlowModel {
         using logic: MacOSDownloaderLogic
     ) async throws -> DownloadManifest {
         currentStage = .connection
-        connectionStatusText = "Łączę się z serwerami Apple i pobieram manifest wybranego systemu..."
+        connectionStatusText = "Łączenie z serwerami Apple i pobieranie manifestu wybranego systemu..."
 
         let manifest = try await logic.prepareDownloadManifest(for: entry) { [weak self] status in
             Task { @MainActor [weak self] in
@@ -140,7 +140,7 @@ extension MontereyDownloadFlowModel {
             )
         }
 
-        connectionStatusText = "Sprawdzam dostepne miejsce w katalogu tymczasowym..."
+        connectionStatusText = "Sprawdzanie dostepnego miejsca w katalogu tymczasowym..."
         try verifyTemporaryDiskCapacity(requiredBytes: manifest.totalExpectedBytes)
 
         downloadTotal = manifest.items.count

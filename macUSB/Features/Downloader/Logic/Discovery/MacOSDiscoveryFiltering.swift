@@ -69,6 +69,28 @@ extension MacOSCatalogService {
         return filtered
     }
 
+    func filterModernAssemblyDescriptors(_ descriptors: [CatalogPackageDescriptor]) -> [CatalogPackageDescriptor] {
+        let installAssistantDescriptors = descriptors.filter { descriptor in
+            let packageID = descriptor.packageIdentifier?.lowercased() ?? ""
+            let fileName = descriptor.url.lastPathComponent.lowercased()
+            return fileName == "installassistant.pkg"
+                || descriptor.name.lowercased() == "installassistant.pkg"
+                || packageID.contains("installassistant")
+        }
+
+        guard !installAssistantDescriptors.isEmpty else {
+            return descriptors
+        }
+
+        // Modern workflow should use a single InstallAssistant package in the download list.
+        if let exactFileName = installAssistantDescriptors.first(where: {
+            $0.url.lastPathComponent.caseInsensitiveCompare("InstallAssistant.pkg") == .orderedSame
+        }) {
+            return [exactFileName]
+        }
+        return [installAssistantDescriptors[0]]
+    }
+
     func deduplicated(_ entries: [MacOSInstallerEntry]) -> [MacOSInstallerEntry] {
         var seen: Set<String> = []
         var result: [MacOSInstallerEntry] = []

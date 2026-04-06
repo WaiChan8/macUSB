@@ -143,7 +143,8 @@ Both modes share the same staged UI and runtime skeleton:
 
 Summary:
 - shows transfer, average speed, duration, and output file name,
-- exposes Finder shortcut to destination folder.
+- exposes Finder shortcut to destination folder,
+- includes destination path and temporary-files cleanup status in dedicated summary rows.
 
 ---
 
@@ -212,7 +213,9 @@ Process screen:
 - active download stage shows:
   - percent above progress bar,
   - speed label and transfer,
-  - inline manifest file list with status icons.
+  - inline manifest file list with status icons,
+  - verification stage text in state form (`Weryfikowanie pliku …`).
+- close confirmation alert is shown only during active running download; summary close action is immediate.
 
 Summary screen:
 - success / partial / failure card tones,

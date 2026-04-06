@@ -201,26 +201,26 @@ extension MacOSDownloaderWindowShellView {
         case .downloading:
             return "arrow.down.circle.fill"
         case .verifying:
-            return "checklist"
+            return "checkmark.shield"
         case .buildingInstaller:
-            return "hammer.circle.fill"
+            return "wand.and.stars"
         case .cleanup:
-            return "trash.fill"
+            return "checkmark.circle"
         }
     }
 
     func downloadStageTitle(for stage: MontereyDownloadFlowStage) -> String {
         switch stage {
         case .connection:
-            return "Sprawdzanie połączenia"
+            return "Łączenie z serwerami Apple"
         case .downloading:
-            return "Pobieranie plików - \(downloadFlowModel.downloadCurrentIndex)/\(downloadFlowModel.downloadTotal)"
+            return "Pobieranie plików"
         case .verifying:
-            return "Weryfikowanie plików - \(downloadFlowModel.verifyCurrentIndex)/\(downloadFlowModel.verifyTotal)"
+            return "Weryfikowanie plików"
         case .buildingInstaller:
-            return "Budowanie instalatora \(installerFamilyLabelForBuildStage())"
+            return "Przygotowywanie instalatora \(installerFamilyLabelForBuildStage())"
         case .cleanup:
-            return "Czyszczenie plików tymczasowych"
+            return "Kończenie pracy"
         }
     }
 
@@ -250,7 +250,12 @@ extension MacOSDownloaderWindowShellView {
         case .downloading:
             return downloadFlowModel.downloadFileName
         case .verifying:
-            return downloadFlowModel.verifyFileName
+            let fileName = downloadFlowModel.verifyFileName.trimmingCharacters(in: .whitespacesAndNewlines)
+            guard !fileName.isEmpty else { return nil }
+            if fileName == "Oczekiwanie..." {
+                return fileName
+            }
+            return "Weryfikowanie pliku \(fileName)..."
         case .buildingInstaller:
             return downloadFlowModel.buildStatusText
         case .cleanup:
