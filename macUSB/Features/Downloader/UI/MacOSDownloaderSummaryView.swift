@@ -137,12 +137,13 @@ extension MacOSDownloaderWindowShellView {
     }
 
     func openPlannedInstallerFolder() {
-        let folderURL: URL
-        if let finalInstallerAppURL = downloadFlowModel.finalInstallerAppURL {
-            folderURL = finalInstallerAppURL.deletingLastPathComponent()
-        } else {
-            folderURL = URL(fileURLWithPath: "/Applications", isDirectory: true)
+        if let finalInstallerAppURL = downloadFlowModel.finalInstallerAppURL,
+           FileManager.default.fileExists(atPath: finalInstallerAppURL.path) {
+            NSWorkspace.shared.activateFileViewerSelecting([finalInstallerAppURL])
+            return
         }
-        NSWorkspace.shared.open(folderURL)
+
+        let fallbackFolderURL = URL(fileURLWithPath: "/Applications", isDirectory: true)
+        NSWorkspace.shared.open(fallbackFolderURL)
     }
 }

@@ -143,7 +143,7 @@ Both modes share the same staged UI and runtime skeleton:
 
 Summary:
 - shows transfer, average speed, duration, and output file name,
-- exposes Finder shortcut to destination folder,
+- exposes Finder shortcut that reveals and selects the created installer `.app` when available (fallback: open destination folder),
 - includes destination path and temporary-files cleanup status in dedicated summary rows.
 
 ---
@@ -219,7 +219,8 @@ Process screen:
 
 Summary screen:
 - success / partial / failure card tones,
-- metrics rows and detailed status section for failures or partial outcomes.
+- metrics rows and detailed status section for failures or partial outcomes,
+- `Pokaż w Finderze` reveals and selects the created installer `.app` when available; otherwise opens `/Applications`.
 
 ---
 
