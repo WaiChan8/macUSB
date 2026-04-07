@@ -141,6 +141,7 @@ struct SystemAnalysisView: View {
                         Text("• Wybrany plik musi zawierać instalator systemu macOS lub Mac OS X")
                         Text("• Dozwolone formaty plików to .dmg, .iso, .cdr oraz .app")
                         Text("• Wymagane jest co najmniej 15 GB wolnego miejsca na dysku twardym")
+                        Text("• Brak instalatora? Użyj przycisku „Pobierz”")
                     }
                     .font(.subheadline).foregroundColor(.secondary)
                 }
@@ -154,6 +155,7 @@ struct SystemAnalysisView: View {
                 .textFieldStyle(.roundedBorder)
                 .disabled(true)
             Button(String(localized: "Wybierz")) { logic.selectDMGFile() }
+            Button(String(localized: "Pobierz")) { MacOSDownloaderWindowManager.shared.present() }
             Button(String(localized: "Analizuj")) { logic.startAnalysis() }
                 .buttonStyle(.borderedProminent)
                 .tint(.accentColor)

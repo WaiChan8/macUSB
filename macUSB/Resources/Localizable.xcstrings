@@ -14,6 +14,9 @@
         }
       }
     },
+    "• Brak instalatora? Użyj przycisku „Pobierz”" : {
+
+    },
     "• Do utworzenia instalatora potrzebny jest nośnik USB o pojemności minimum %@ GB" : {
       "localizations" : {
         "de" : {
@@ -11613,7 +11616,7 @@
         }
       }
     },
-    "Opcje listy systemów" : {
+    "Opcje pobierania" : {
 
     },
     "Operacja nie powiodła się" : {
@@ -12280,7 +12283,7 @@
     "Pokaż w Finderze" : {
 
     },
-    "Pokaż wszystkie dostępne wersje" : {
+    "Pokaż wszystkie wersje" : {
 
     },
     "Połączenie internetowe zostało utracone" : {

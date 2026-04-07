@@ -18,6 +18,7 @@ Destructive start requires explicit confirmation.
 ## Tools Flow: Downloader
 
 - `Tools -> Download macOS installer...` opens downloader window.
+- `SystemAnalysisView` also exposes `Pobierz` between `Wybierz` and `Analizuj` for direct downloader access.
 - Discovery starts on entering downloader window (never on app startup).
 - While discovery runs, header/options remain visible; list area shows scanning panel.
 - After discovery completes, grouped systems list is shown.

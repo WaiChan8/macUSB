@@ -267,10 +267,10 @@ private struct MacOSDownloaderOptionsSheetView: View {
 
     var body: some View {
         VStack(alignment: .leading, spacing: 14) {
-            Text("Opcje listy systemów")
+            Text("Opcje pobierania")
                 .font(.headline)
 
-            Toggle("Pokaż wszystkie dostępne wersje", isOn: $showAllAvailableVersions)
+            Toggle("Pokaż wszystkie wersje", isOn: $showAllAvailableVersions)
                 .toggleStyle(.checkbox)
 
             #if DEBUG
@@ -278,7 +278,7 @@ private struct MacOSDownloaderOptionsSheetView: View {
                 Capsule()
                     .fill(Color.secondary.opacity(0.20))
                     .frame(height: 1)
-                Text("DEBUG")
+                Text("Deweloperskie")
                     .font(.caption.weight(.semibold))
                     .foregroundStyle(.secondary)
                 Capsule()
@@ -287,7 +287,7 @@ private struct MacOSDownloaderOptionsSheetView: View {
             }
             .padding(.vertical, 2)
 
-            Toggle("DEBUG: Nie usuwaj pobranych plików", isOn: $preserveDownloadedFilesInDebug)
+            Toggle("Zachowaj pobrane pliki (Debug)", isOn: $preserveDownloadedFilesInDebug)
                 .toggleStyle(.checkbox)
             #endif
 
@@ -298,7 +298,7 @@ private struct MacOSDownloaderOptionsSheetView: View {
                 Button {
                     dismiss()
                 } label: {
-                    Text("Gotowe")
+                    Text("OK")
                         .padding(.horizontal, 16)
                         .padding(.vertical, 6)
                 }

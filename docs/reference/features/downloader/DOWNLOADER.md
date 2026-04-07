@@ -199,6 +199,7 @@ Helper responsibilities in downloader flow:
 Window:
 - fixed-width sheet from coordinator,
 - app-like liquid/glass-compatible surfaces and tokens.
+- can be opened from `Tools -> Pobierz instalator macOS...` and from the analysis screen button `Pobierz`.
 
 List screen:
 - grouped families,
