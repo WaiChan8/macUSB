@@ -123,7 +123,7 @@ Production pipeline (`MontereyDownloadFlowModel`) uses two compatible distributi
 Both modes share the same staged UI and runtime skeleton:
 1. Connection / preflight
   - fetch real manifest for selected supported entry,
-  - validate temporary disk capacity against total expected bytes + reserve.
+  - validate temporary disk capacity against 250% of total expected installer bytes.
 2. Sequential file download
   - one file at a time,
   - progress %, speed sampling, transferred bytes text,
@@ -231,6 +231,7 @@ Rules:
 
 User-facing messaging:
 - permission/move failures are rewritten to clearer, action-oriented text,
+- insufficient disk space during preflight is shown as a system `NSAlert` with required minimum and available space values,
 - technical detail remains in logs.
 
 ---

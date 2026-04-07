@@ -46,7 +46,10 @@ extension MacOSDownloaderWindowShellView {
                 value: downloadFlowModel.summaryTemporaryFilesText
             )
 
-            if isFailure, let failureMessage = downloadFlowModel.failureMessage, !failureMessage.isEmpty {
+            if isFailure,
+               !downloadFlowModel.suppressInlineFailureMessage,
+               let failureMessage = downloadFlowModel.failureMessage,
+               !failureMessage.isEmpty {
                 Divider()
                 VStack(alignment: .leading, spacing: 4) {
                     Text(isPartial ? "Status" : "Szczegóły")

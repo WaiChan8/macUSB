@@ -41,6 +41,11 @@ extension MontereyDownloadFlowModel {
         } catch {
             let technicalMessage = (error as? LocalizedError)?.errorDescription ?? error.localizedDescription
             workflowState = .failed
+            suppressInlineFailureMessage = false
+            if let diskSpaceAlertContext = diskSpaceAlertContext(from: error) {
+                pendingDiskSpaceAlert = diskSpaceAlertContext
+                suppressInlineFailureMessage = true
+            }
             let isCleanupFailure = {
                 if case DownloadFailureReason.cleanupFailed = error { return true }
                 return false
@@ -82,6 +87,19 @@ extension MontereyDownloadFlowModel {
             playCompletionSound(success: false)
             isFinished = true
         }
+    }
+
+    func diskSpaceAlertContext(from error: Error) -> DiskSpaceAlertContext? {
+        guard let reason = error as? DownloadFailureReason else {
+            return nil
+        }
+        guard case let .insufficientDiskSpace(requiredMinimumBytes, availableBytes, _) = reason else {
+            return nil
+        }
+        return DiskSpaceAlertContext(
+            requiredMinimumText: DownloadManifestItem.formatBytes(requiredMinimumBytes),
+            availableText: DownloadManifestItem.formatBytes(availableBytes)
+        )
     }
 
     func userFacingFailureMessage(for technicalMessage: String) -> String {

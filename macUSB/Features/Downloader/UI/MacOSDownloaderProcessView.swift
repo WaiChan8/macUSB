@@ -51,7 +51,8 @@ extension MacOSDownloaderWindowShellView {
                             }
                         }
 
-                        if let failureMessage = downloadFlowModel.failureMessage,
+                        if !downloadFlowModel.suppressInlineFailureMessage,
+                           let failureMessage = downloadFlowModel.failureMessage,
                            !failureMessage.isEmpty {
                             StatusCard(tone: .warning, density: .compact) {
                                 VStack(alignment: .leading, spacing: 4) {
