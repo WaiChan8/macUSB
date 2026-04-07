@@ -25,6 +25,7 @@ enum DownloadSessionState: Equatable {
 
 enum DownloadFailureReason: LocalizedError {
     case unsupportedSelection
+    case insufficientDiskSpace(requiredMinimumBytes: Int64, availableBytes: Int64, installerBytes: Int64)
     case sessionInitializationFailed(String)
     case downloadFailed(String)
     case verificationFailed(String)
@@ -35,6 +36,8 @@ enum DownloadFailureReason: LocalizedError {
         switch self {
         case .unsupportedSelection:
             return "Wybrana pozycja nie jest wspierana w aktualnym pobieraniu"
+        case let .insufficientDiskSpace(requiredMinimumBytes, availableBytes, installerBytes):
+            return "Brak wolnego miejsca: wymagane minimum \(DownloadManifestItem.formatBytes(requiredMinimumBytes)) (250% rozmiaru instalatora \(DownloadManifestItem.formatBytes(installerBytes))), dostepne \(DownloadManifestItem.formatBytes(availableBytes))."
         case let .sessionInitializationFailed(details):
             return "Nie udalo sie przygotowac sesji pobierania: \(details)"
         case let .downloadFailed(details):
@@ -87,6 +90,11 @@ struct DownloadManifest: Hashable {
     let totalExpectedBytes: Int64
 }
 
+struct DiskSpaceAlertContext: Equatable {
+    let requiredMinimumText: String
+    let availableText: String
+}
+
 @MainActor
 final class MontereyDownloadFlowModel: ObservableObject {
     @Published var currentStage: MontereyDownloadFlowStage = .connection
@@ -97,6 +105,7 @@ final class MontereyDownloadFlowModel: ObservableObject {
     @Published var isPartialSuccess: Bool = false
     @Published var cleanupWarningMessage: String?
     @Published var networkWarningMessage: String?
+    @Published var hasExpiredButTrustedAppleSignature: Bool = false
 
     @Published var connectionStatusText: String = "Łączenie z serwerami Apple..."
     @Published var downloadCurrentIndex: Int = 0
@@ -120,6 +129,8 @@ final class MontereyDownloadFlowModel: ObservableObject {
     @Published var summaryTemporaryFilesText: String = "Brak danych"
     @Published var summaryCreatedFileText: String = "Brak danych"
     @Published var discoveredDownloadItems: [DownloadManifestItem] = []
+    @Published var pendingDiskSpaceAlert: DiskSpaceAlertContext?
+    @Published var suppressInlineFailureMessage: Bool = false
 
     @Published var preserveDownloadedFilesInDebug: Bool = false
 
@@ -191,6 +202,7 @@ final class MontereyDownloadFlowModel: ObservableObject {
         isPartialSuccess = false
         cleanupWarningMessage = nil
         networkWarningMessage = nil
+        hasExpiredButTrustedAppleSignature = false
 
         connectionStatusText = "Łączenie z serwerami Apple..."
         downloadCurrentIndex = 0
@@ -214,6 +226,8 @@ final class MontereyDownloadFlowModel: ObservableObject {
         summaryTemporaryFilesText = "Brak danych"
         summaryCreatedFileText = "Brak danych"
         discoveredDownloadItems = []
+        pendingDiskSpaceAlert = nil
+        suppressInlineFailureMessage = false
 
         processStartedAt = Date()
         totalDownloadedBytes = 0
