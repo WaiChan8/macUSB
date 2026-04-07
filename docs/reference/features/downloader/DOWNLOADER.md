@@ -156,6 +156,7 @@ Per-file verification order:
 3. for `Oldest` (`10.7` to `10.12`) `.dmg` payloads: mount image and verify embedded `.pkg` signature (`pkgutil --check-signature`),
 4. for non-`Oldest` payloads: package signature check (`pkgutil`) for `.pkg` files,
 5. for non-`Oldest` payloads: IntegrityData chunklist validation (`SHA-256` per chunk) when available.
+6. High Sierra (`10.13`) fallback: when `IntegrityDataURL` is missing for legacy payloads (`InstallAssistantAuto.pkg`, `RecoveryHDMetaDmg.pkg`, `InstallESDDmg.pkg`), verify per-file SHA-256 against references from `DownloadChecksums.json`.
 
 `Oldest` specific rule:
 - for `.dmg` installers in `10.7` to `10.12`, the verification flow intentionally stops after reference SHA-256 and embedded package-signature validation (no IntegrityData checks).
@@ -216,6 +217,7 @@ Process screen:
 Summary screen:
 - success / partial / failure card tones,
 - metrics rows and detailed status section for failures or partial outcomes.
+- when an expired-but-trusted Apple package signature is accepted (currently Lion/Mountain Lion path), summary shows an additional neutral informational card with `info` icon explaining that signature trust is valid for this legacy case.
 
 ---
 

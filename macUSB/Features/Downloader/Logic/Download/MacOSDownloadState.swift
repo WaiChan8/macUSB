@@ -97,6 +97,7 @@ final class MontereyDownloadFlowModel: ObservableObject {
     @Published var isPartialSuccess: Bool = false
     @Published var cleanupWarningMessage: String?
     @Published var networkWarningMessage: String?
+    @Published var hasExpiredButTrustedAppleSignature: Bool = false
 
     @Published var connectionStatusText: String = "Łączenie z serwerami Apple..."
     @Published var downloadCurrentIndex: Int = 0
@@ -191,6 +192,7 @@ final class MontereyDownloadFlowModel: ObservableObject {
         isPartialSuccess = false
         cleanupWarningMessage = nil
         networkWarningMessage = nil
+        hasExpiredButTrustedAppleSignature = false
 
         connectionStatusText = "Łączenie z serwerami Apple..."
         downloadCurrentIndex = 0

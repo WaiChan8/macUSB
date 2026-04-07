@@ -11,6 +11,12 @@ extension MontereyDownloadFlowModel {
         let family: String
         let name: String
         let version: String
+        let sha256: String?
+        let files: [DownloadChecksumFileRecord]?
+    }
+
+    private struct DownloadChecksumFileRecord: Decodable {
+        let name: String
         let sha256: String
     }
 
@@ -85,6 +91,17 @@ extension MontereyDownloadFlowModel {
             ) {
                 AppLogging.info(
                     "Weryfikacja \(verifyCurrentIndex)/\(verifyTotal): zakonczona sukcesem przez IntegrityData dla \(item.name)",
+                    category: "Downloader"
+                )
+                verifiedCount += 1
+                verifyProgress = min(1.0, Double(verifiedCount) / totalCount)
+                continue
+            }
+
+            if shouldRunHighSierraLegacySHA256Fallback(for: entry, item: item) {
+                try verifyHighSierraReferenceSHA256(for: localURL, entry: entry, item: item)
+                AppLogging.info(
+                    "Weryfikacja \(verifyCurrentIndex)/\(verifyTotal): fallback SHA-256 dla High Sierra zakonczony sukcesem dla \(item.name)",
                     category: "Downloader"
                 )
                 verifiedCount += 1
@@ -171,6 +188,7 @@ extension MontereyDownloadFlowModel {
         if task.terminationStatus != 0 {
             if allowExpiredAppleCertificate,
                isExpiredAppleSignedPackageSignature(details) {
+                registerExpiredButTrustedAppleSignature(for: packageURL)
                 AppLogging.info(
                     "Podpis pakietu zawiera wygasly certyfikat Apple, ale zostal zaakceptowany dla \(packageURL.lastPathComponent): \(details)",
                     category: "Downloader"
@@ -186,6 +204,10 @@ extension MontereyDownloadFlowModel {
             "Podpis pakietu potwierdzony (pkgutil) dla \(packageURL.lastPathComponent)\(details.isEmpty ? "" : ": \(details)")",
             category: "Downloader"
         )
+    }
+
+    private func registerExpiredButTrustedAppleSignature(for packageURL: URL) {
+        hasExpiredButTrustedAppleSignature = true
     }
 
     private func isExpiredAppleSignedPackageSignature(_ details: String) -> Bool {
@@ -314,6 +336,64 @@ extension MontereyDownloadFlowModel {
         }
     }
 
+    private func verifyHighSierraReferenceSHA256(
+        for fileURL: URL,
+        entry: MacOSInstallerEntry,
+        item: DownloadManifestItem
+    ) throws {
+        let expectedSHA = try expectedReferenceChecksumForHighSierra(entry: entry, item: item)
+        let actualSHA = try computeFileSHA256Hex(for: fileURL)
+
+        AppLogging.info(
+            "High Sierra SHA-256 fallback verify \(entry.name) \(entry.version) \(item.name): expected=\(expectedSHA), actual=\(actualSHA)",
+            category: "Downloader"
+        )
+
+        guard actualSHA.caseInsensitiveCompare(expectedSHA) == .orderedSame else {
+            throw DownloadFailureReason.verificationFailed(
+                "SHA-256 pliku \(fileURL.lastPathComponent) nie zgadza sie z referencja dla \(entry.name) \(entry.version)"
+            )
+        }
+    }
+
+    private func shouldRunHighSierraLegacySHA256Fallback(
+        for entry: MacOSInstallerEntry,
+        item: DownloadManifestItem
+    ) -> Bool {
+        guard entry.version.hasPrefix("10.13") else {
+            return false
+        }
+
+        let normalizedName = entry.name.lowercased()
+        guard normalizedName.contains("high sierra") else {
+            return false
+        }
+
+        let fileKey = normalizedHighSierraChecksumFileKey(for: item)
+        return highSierraFallbackChecksumFileKeys.contains(fileKey)
+    }
+
+    private var highSierraFallbackChecksumFileKeys: Set<String> {
+        [
+            "installassistantauto.pkg",
+            "recoveryhdmetadmg.pkg",
+            "installesddmg.pkg"
+        ]
+    }
+
+    private func normalizedHighSierraChecksumFileKey(for item: DownloadManifestItem) -> String {
+        let candidateNames = [item.name, item.url.lastPathComponent]
+        for candidate in candidateNames {
+            let normalized = candidate
+                .trimmingCharacters(in: .whitespacesAndNewlines)
+                .lowercased()
+            if !normalized.isEmpty {
+                return normalized
+            }
+        }
+        return ""
+    }
+
     private func expectedReferenceChecksumForOldest(entry: MacOSInstallerEntry) throws -> String {
         let manifest = try loadDownloadChecksumsManifest()
         let normalizedName = entry.name.lowercased().trimmingCharacters(in: .whitespacesAndNewlines)
@@ -329,7 +409,48 @@ extension MontereyDownloadFlowModel {
             )
         }
 
-        return match.sha256.lowercased()
+        guard let sha256 = match.sha256?.trimmingCharacters(in: .whitespacesAndNewlines), !sha256.isEmpty else {
+            throw DownloadFailureReason.verificationFailed(
+                "Brak referencyjnego SHA-256 dla \(entry.name) \(entry.version) w DownloadChecksums.json"
+            )
+        }
+
+        return sha256.lowercased()
+    }
+
+    private func expectedReferenceChecksumForHighSierra(
+        entry: MacOSInstallerEntry,
+        item: DownloadManifestItem
+    ) throws -> String {
+        let manifest = try loadDownloadChecksumsManifest()
+        let normalizedVersion = entry.version.trimmingCharacters(in: .whitespacesAndNewlines)
+        let requestedFileKey = normalizedHighSierraChecksumFileKey(for: item)
+
+        guard let highSierraRecord = manifest.systems.first(where: { record in
+            record.family.caseInsensitiveCompare("legacy") == .orderedSame
+                && record.version == normalizedVersion
+                && record.name.lowercased().contains("high sierra")
+        }) else {
+            throw DownloadFailureReason.verificationFailed(
+                "Brak referencyjnych SHA-256 dla \(entry.name) \(entry.version) w DownloadChecksums.json"
+            )
+        }
+
+        guard let files = highSierraRecord.files, !files.isEmpty else {
+            throw DownloadFailureReason.verificationFailed(
+                "Brak listy plikow referencyjnych SHA-256 dla \(entry.name) \(entry.version) w DownloadChecksums.json"
+            )
+        }
+
+        guard let fileRecord = files.first(where: { record in
+            record.name.trimmingCharacters(in: .whitespacesAndNewlines).lowercased() == requestedFileKey
+        }) else {
+            throw DownloadFailureReason.verificationFailed(
+                "Brak referencyjnego SHA-256 dla pliku \(item.name) (\(entry.name) \(entry.version)) w DownloadChecksums.json"
+            )
+        }
+
+        return fileRecord.sha256.trimmingCharacters(in: .whitespacesAndNewlines).lowercased()
     }
 
     private func loadDownloadChecksumsManifest() throws -> DownloadChecksumsManifest {
