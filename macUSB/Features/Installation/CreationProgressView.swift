@@ -15,6 +15,9 @@ private struct CreationStageDescriptor: Identifiable {
 }
 
 struct CreationProgressView: View {
+    @ObservedObject private var menuState = MenuState.shared
+    private let downloaderBlockReason = "usb_creation_progress"
+
     let systemName: String
     let mountPoint: URL
     let detectedSystemIcon: NSImage?
@@ -144,6 +147,12 @@ struct CreationProgressView: View {
         .frame(width: MacUSBDesignTokens.windowWidth, height: MacUSBDesignTokens.windowHeight)
         .navigationTitle("Tworzenie nośnika")
         .navigationBarBackButtonHidden(true)
+        .onAppear {
+            menuState.setDownloaderAccessBlocked(true, reason: downloaderBlockReason)
+        }
+        .onDisappear {
+            menuState.setDownloaderAccessBlocked(false, reason: downloaderBlockReason)
+        }
         .background(
             NavigationLink(
                 destination: FinishUSBView(

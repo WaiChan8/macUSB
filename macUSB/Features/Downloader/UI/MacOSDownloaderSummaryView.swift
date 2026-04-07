@@ -68,6 +68,20 @@ extension MacOSDownloaderWindowShellView {
             if shouldShowInstallerOutputSection {
                 HStack {
                     Spacer()
+                    if hasFinalInstallerApp {
+                        Button {
+                            useDownloadedInstallerInAnalysis()
+                        } label: {
+                            HStack(spacing: 8) {
+                                Image(systemName: "arrow.right.circle.fill")
+                                Text("Przejdź do tworzenia USB z tym instalatorem")
+                            }
+                            .padding(.horizontal, 12)
+                            .padding(.vertical, 6)
+                        }
+                        .macUSBSecondaryButtonStyle()
+                        .help("Przejdź do tworzenia USB z tym instalatorem")
+                    }
                     Button {
                         openPlannedInstallerFolder()
                     } label: {
@@ -190,5 +204,18 @@ extension MacOSDownloaderWindowShellView {
 
         let folderURL = URL(fileURLWithPath: "/Applications", isDirectory: true)
         NSWorkspace.shared.open(folderURL)
+    }
+
+    func useDownloadedInstallerInAnalysis() {
+        guard let finalInstallerAppURL = downloadFlowModel.finalInstallerAppURL,
+              FileManager.default.fileExists(atPath: finalInstallerAppURL.path)
+        else {
+            return
+        }
+
+        AnalysisSelectionHandoff.shared.setPendingInstallerURL(finalInstallerAppURL)
+        NotificationCenter.default.post(name: .macUSBNavigateToAnalysis, object: nil)
+        NotificationCenter.default.post(name: .macUSBApplyPendingDownloaderInstaller, object: nil)
+        handleCloseRequest()
     }
 }

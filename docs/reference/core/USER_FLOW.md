@@ -19,9 +19,11 @@ Destructive start requires explicit confirmation.
 
 - `Tools -> Download macOS installer...` opens downloader window.
 - `SystemAnalysisView` also exposes `Pobierz` between `Wybierz` and `Analizuj` for direct downloader access.
+- Downloader opening is blocked during USB creation operation stages (`UniversalInstallationView`, `CreationProgressView`, `FinishUSBView`), and `Tools -> Pobierz instalator macOS...` is disabled there.
 - Discovery starts on entering downloader window (never on app startup).
 - While discovery runs, header/options remain visible; list area shows scanning panel.
 - After discovery completes, grouped systems list is shown.
+- On downloader summary, when final `.app` exists, icon action can pass installer path to analysis and trigger automatic analysis; from Welcome, app navigates to analysis first.
 
 ## Update Trigger
 

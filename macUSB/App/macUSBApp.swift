@@ -274,6 +274,7 @@ struct macUSBApp: App {
                 } label: {
                     Label(String(localized: "Pobierz instalator macOS..."), systemImage: "square.and.arrow.down")
                 }
+                .disabled(menuState.isDownloaderAccessBlocked)
                 Divider()
                 Button {
                     if let appURL = NSWorkspace.shared.urlForApplication(withBundleIdentifier: "com.apple.DiskUtility") {

@@ -149,6 +149,7 @@ Power management contract during production download flow:
 Summary:
 - shows transfer, average speed, duration, and output file name,
 - exposes Finder shortcut that reveals and selects the created installer `.app` when available (fallback: open destination folder),
+- when final installer `.app` exists, exposes adjacent icon action that hands this `.app` path into analysis flow, triggers analysis automatically, and closes downloader window,
 - includes destination path and temporary-files cleanup status in dedicated summary rows.
 
 ---
@@ -200,6 +201,7 @@ Window:
 - fixed-width sheet from coordinator,
 - app-like liquid/glass-compatible surfaces and tokens.
 - can be opened from `Tools -> Pobierz instalator macOS...` and from the analysis screen button `Pobierz`.
+- opening is blocked while USB creation flow is in operation screens (`UniversalInstallationView`, `CreationProgressView`, `FinishUSBView`), and the Tools menu item is disabled in those stages.
 
 List screen:
 - grouped families,
@@ -224,6 +226,7 @@ Summary screen:
 - success / partial / failure card tones,
 - metrics rows and detailed status section for failures or partial outcomes,
 - `Pokaż w Finderze` reveals and selects the created installer `.app` when available; otherwise opens `/Applications`.
+- when summary has a ready final `.app`, icon action next to Finder shortcut sends it to analysis and auto-runs analysis; if app is on Welcome screen, flow auto-navigates to analysis first.
 - when an expired-but-trusted Apple package signature is accepted (currently Lion/Mountain Lion path), summary shows an additional neutral informational card with `info` icon explaining that signature trust is valid for this legacy case.
 
 ---

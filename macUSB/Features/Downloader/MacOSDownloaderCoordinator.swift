@@ -11,6 +11,14 @@ final class MacOSDownloaderWindowManager {
     private init() {}
 
     func present() {
+        guard !MenuState.shared.isDownloaderAccessBlocked else {
+            AppLogging.info(
+                "Otwarcie downloadera zablokowane: trwa lub podsumowuje sie proces tworzenia nośnika USB.",
+                category: "Downloader"
+            )
+            return
+        }
+
         if let sheetWindow {
             sheetWindow.makeKeyAndOrderFront(nil)
             return

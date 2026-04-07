@@ -3,6 +3,7 @@ import AppKit
 
 struct UniversalInstallationView: View {
     @ObservedObject private var menuState = MenuState.shared
+    private let downloaderBlockReason = "usb_installation_summary"
 
     let sourceAppURL: URL
     let targetDrive: USBDrive?
@@ -439,6 +440,7 @@ struct UniversalInstallationView: View {
             .hidden()
         )
         .onAppear {
+            menuState.setDownloaderAccessBlocked(true, reason: downloaderBlockReason)
             AppLogging.separator()
             AppLogging.separator()
             AppLogging.info("Przejście do kreatora", category: "Navigation")
@@ -453,6 +455,7 @@ struct UniversalInstallationView: View {
             refreshRequiredPermissionsState()
         }
         .onDisappear {
+            menuState.setDownloaderAccessBlocked(false, reason: downloaderBlockReason)
             stopUSBMonitoring()
             if !navigateToCreationProgress && !isHelperWorking {
                 stopHelperWriteSpeedMonitoring()
