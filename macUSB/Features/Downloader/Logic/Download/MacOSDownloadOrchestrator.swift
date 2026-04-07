@@ -2,6 +2,9 @@ import Foundation
 
 extension MontereyDownloadFlowModel {
     func runWorkflow(for entry: MacOSInstallerEntry, using logic: MacOSDownloaderLogic) async {
+        let sleepBlockToken = SystemSleepBlocker.shared.begin(reason: "Pobieranie systemu macOS")
+        defer { SystemSleepBlocker.shared.end(sleepBlockToken) }
+
         workflowState = .running
 
         do {

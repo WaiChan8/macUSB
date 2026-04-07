@@ -141,6 +141,11 @@ Both modes share the same staged UI and runtime skeleton:
   - dedicated helper-side cleanup of session temp directory,
   - executed as last stage before summary.
 
+Power management contract during production download flow:
+- idle sleep is blocked for the full runtime of one download session,
+- activation starts when download workflow starts (`running` state),
+- release is guaranteed on every terminal path: success, failure, or cancellation.
+
 Summary:
 - shows transfer, average speed, duration, and output file name,
 - exposes Finder shortcut to destination folder,
