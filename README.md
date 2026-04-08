@@ -2,9 +2,9 @@
 
 ### Creating bootable macOS and OS X USB drives has never been easier!
 
-![Platform](https://img.shields.io/badge/Platform-macOS-black) ![Architecture](https://img.shields.io/badge/Architecture-Apple_Silicon/Intel-black) ![License](https://img.shields.io/badge/License-MIT-blue) ![Security](https://img.shields.io/badge/Security-Notarized-success) [![Website](https://img.shields.io/badge/Website-macUSB-blueviolet)](https://kruszoneq.github.io/macUSB/) ![Vibe Coded](https://img.shields.io/badge/Vibe%20Coded%20-gray)
+![Platform](https://img.shields.io/badge/Platform-macOS-black) ![Architecture](https://img.shields.io/badge/Architecture-Apple_Silicon/Intel-black) ![License](https://img.shields.io/badge/License-MIT-blue) ![Security](https://img.shields.io/badge/Security-Notarized-success) [![Website](https://img.shields.io/badge/Website-macUSB-blueviolet)](https://kruszoneq.github.io/macUSB/)
 
-**macUSB** is a guided macOS app for creating bootable USB installers from `.dmg`, `.iso`, `.cdr`, and `.app` sources.
+**macUSB** is a guided macOS app focused on creating bootable USB installers on Apple Silicon and Intel Macs, using local `.dmg`, `.iso`, `.cdr`, `.app` sources or the built-in downloader.
 
 ## 📥 How to Download macUSB
 
@@ -31,7 +31,7 @@ If the project helps you, you can support ongoing development:
 ---
 
 <p align="center">
-  <img src="docs/readme-assets/images/macUSBreadmepreview.png" alt="macUSB UI preview" width="980">
+  <img src="docs/readme-assets/images/macusb-readme-hero.png" alt="macUSB UI preview" width="980">
 </p>
 
 ---
@@ -51,29 +51,21 @@ Common issues reported across forums and guides include:
 
 ## ✅ Key Features
 
-- **One guided flow:** from source analysis to final bootable media.
-- **Broad source support:** `.dmg`, `.iso`, `.cdr`, and `.app`.
-- **Legacy compatibility focus:** supports modern macOS plus older OS X / Mac OS X generations.
+- **Built-in Downloader:** discovers and downloads macOS installers available from Apple servers.
+- **Local source support:** create USB from `.dmg`, `.iso`, `.cdr`, and `.app`.
+- **One guided flow:** from source/downloader selection to final bootable media.
+- **Apple Silicon legacy support:** automatic compatibility handling for older installers during bootable USB creation.
 - **Automatic media prep:** partition and format checks with conversion when required.
 - **PowerPC-ready paths:** dedicated support for Tiger/Leopard-era scenarios.
-- **Notarized build:** Apple-notarized app for safer first launch.
-
----
-
-## ✨ What’s New in v2.0
-
-- Native privileged helper via **SMAppService** for a more stable, terminal-free creation workflow.
-- New creation progress flow with per-stage status and real-time write speed.
-- Stronger safety and diagnostics: USB/media pre-checks, optional completion notifications, and built-in log export.
-
-Full change list: [Releases](https://github.com/Kruszoneq/macUSB/releases)
 
 ---
 
 ## ⚡ Quick Start
 
 1. Install macUSB using one of the methods listed in **How to Download macUSB**.
-2. Open macUSB and select an installer source file (`.dmg`, `.iso`, `.cdr`, or `.app`).
+2. Open macUSB and either:
+   - choose a local installer file (`.dmg`, `.iso`, `.cdr`, or `.app`), or
+   - use the built-in Downloader to fetch a macOS installer.
 3. Select the target USB drive and review operation details.
 4. Start creation and monitor stage-by-stage progress.
 5. Use the final result screen for next steps.
@@ -123,7 +115,7 @@ Full change list: [Releases](https://github.com/Kruszoneq/macUSB/releases)
       <a href="docs/readme-assets/app-screens/source-target-configuration.png">
         <img src="docs/readme-assets/app-screens/source-target-configuration.png" alt="Source and target configuration" width="190">
       </a><br>
-      <sub>Select installer and USB drive.</sub>
+      <sub>Choose local installer or Downloader, then select USB.</sub>
     </td>
     <td align="center" valign="top">
       <strong>3. Operation Details</strong><br>
@@ -156,30 +148,62 @@ Full change list: [Releases](https://github.com/Kruszoneq/macUSB/releases)
 
 ---
 
+## 🌐 Downloader Workflow
+
+<p align="center">
+  Click any screenshot to open full size.
+</p>
+
+<table align="center">
+  <tr>
+    <td align="center" valign="top">
+      <strong>1. Installer List</strong><br>
+      <a href="docs/readme-assets/app-screens/downloader-list.png">
+        <img src="docs/readme-assets/app-screens/downloader-list.png" alt="Downloader installer list" width="190">
+      </a><br>
+      <sub>Browse macOS installers available from Apple servers.</sub>
+    </td>
+    <td align="center" valign="top">
+      <strong>2. Download Progress</strong><br>
+      <a href="docs/readme-assets/app-screens/downloader-process.png">
+        <img src="docs/readme-assets/app-screens/downloader-process.png" alt="Downloader progress view" width="190">
+      </a><br>
+      <sub>Track download and preparation progress in real time.</sub>
+    </td>
+    <td align="center" valign="top">
+      <strong>3. Download Summary</strong><br>
+      <a href="docs/readme-assets/app-screens/downloader-summary.png">
+        <img src="docs/readme-assets/app-screens/downloader-summary.png" alt="Downloader summary view" width="190">
+      </a><br>
+      <sub>Review final status and use the installer in creation flow.</sub>
+    </td>
+  </tr>
+</table>
+
+---
+
 ## ⚙️ Requirements
 
 ### Host Computer
 - **Processor:** Apple Silicon or Intel.
 - **System:** **macOS 14.6 Sonoma** or newer.
-- **Free disk space:** at least **15 GB** available for installer preparation.
+- **Free disk space:**
+  - **Downloader stage:** **15–45 GB**, depending on selected macOS version.
+  - **Installer creation stage:** **10–20 GB**, depending on target system version.
 
 ### USB Media
 - **Capacity:** at least **16 GB**; use **32 GB minimum** for **macOS 15 Sequoia** and **macOS 26 Tahoe** installers.
 - **Performance:** USB 3.0+ is recommended.
 - **External HDD/SSD support:** installer creation on external hard drives is disabled by default on every app launch to improve safety and reduce the risk of accidental target selection. You can enable it in **Options** → **Enable external drives support**.
 
-### Installer Source Files
-Accepted source types:
+### Installer Inputs
+Accepted local installer types:
 - `.dmg`
 - `.cdr`
 - `.iso`
 - `.app`
 
-Recommended installer sources:
-- **OS X 10.7-10.8** and **10.10 through macOS 26:** [the **Mist app**](https://github.com/ninxsoft/Mist)
-- **OS X 10.9 Mavericks:** recommended and verified source is [Mavericks Forever](https://mavericksforever.com/). Images from other sources may not work correctly.
-- **Mac OS X 10.4-10.6 (Intel):** Internet Archive
-- **Mac OS X 10.4-10.5 (PowerPC):** Macintosh Garden
+Or use the built-in Downloader to fetch installers available from Apple servers.
 
 ---
 
@@ -207,6 +231,9 @@ Systems recognized and supported for USB creation:
 | **Mac OS X Snow Leopard** | 10.6 | ✅ |
 | **Mac OS X Leopard** | 10.5 | ✅ |
 | **Mac OS X Tiger**[^3] | 10.4 | ✅ |
+
+> The table describes versions supported for bootable USB creation.
+> Downloader availability depends on installers currently published by Apple.
 
 [^1]: Only **10.12.6** is supported.
 [^2]: Fully verified with the image from [Mavericks Forever](https://mavericksforever.com/). Other sources may fail.
@@ -249,16 +276,12 @@ The interface follows system language automatically:
 
 ## 🛠️ Diagnostics & Support
 
-- Before opening an issue, export logs from **Help** → **Export diagnostic logs...** and attach them.
-- Report bugs and feature requests via [GitHub Issues](https://github.com/Kruszoneq/macUSB/issues).
-- Use issue templates to speed up triage and reproducibility.
+Use [GitHub Issues](https://github.com/Kruszoneq/macUSB/issues) for troubleshooting, bug reports, and feature requests.
 
-Helpful details in bug reports:
-- Host macOS version
-- Target installer version
-- Source format (`.dmg`, `.iso`, `.cdr`, `.app`)
-- Installer source link
-- Screenshot of error/result state
+Before submitting:
+- use the appropriate issue template,
+- attach diagnostic logs exported from `Help` → `Export diagnostic logs...`,
+- attach screenshots showing the issue.
 
 ---
 

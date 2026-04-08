@@ -19,6 +19,7 @@ macUSB v2.1 brings a new built-in macOS Downloader, improved helper reliability 
 - Helper repair is now more reliable and repeatable, especially in cases where macOS temporarily blocks or delays background activation, with more stable recovery after reconnection attempts.
 - Helper repair is now presented as a system alert, improving UI consistency and making recovery status easier to follow.
 - After updating to a new app version, helper auto-repair now runs automatically to ensure compatibility with newly introduced functionality.
+- Added sleep prevention while downloading macOS and while creating a USB installer.
 - Minor UI polish during the USB creation stage.
 
 ---
