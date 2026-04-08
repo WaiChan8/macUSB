@@ -24,6 +24,7 @@ extension MontereyDownloadFlowModel {
         manifest: DownloadManifest,
         entry: MacOSInstallerEntry
     ) async throws {
+        let usesModernVerificationProgress = shouldUseModernVerificationProgress(in: manifest)
         currentStage = .verifying
         verifyCurrentIndex = 0
         verifyTotal = manifest.items.count
@@ -44,7 +45,7 @@ extension MontereyDownloadFlowModel {
             updateVerificationProgress(
                 completedFiles: verifiedCount,
                 totalCount: totalCount,
-                currentFileFraction: 0.02
+                currentFileFraction: usesModernVerificationProgress ? 0.0 : 0.02
             )
 
             guard let localURL = downloadedFileURLsByItemID[item.id] else {
@@ -64,7 +65,7 @@ extension MontereyDownloadFlowModel {
             updateVerificationProgress(
                 completedFiles: verifiedCount,
                 totalCount: totalCount,
-                currentFileFraction: 0.15
+                currentFileFraction: usesModernVerificationProgress ? 0.20 : 0.15
             )
 
             if shouldRunOldestOnlyVerification {
@@ -85,7 +86,9 @@ extension MontereyDownloadFlowModel {
                     self.updateVerificationProgress(
                         completedFiles: verifiedCount,
                         totalCount: totalCount,
-                        currentFileFraction: 0.15 + (fileFraction * 0.65)
+                        currentFileFraction: usesModernVerificationProgress
+                            ? (0.20 + (fileFraction * 0.80))
+                            : (0.15 + (fileFraction * 0.65))
                     )
                 }
             ) {
@@ -139,6 +142,22 @@ extension MontereyDownloadFlowModel {
         let clampedFraction = min(max(currentFileFraction, 0), 1)
         let normalized = (Double(completedFiles) + clampedFraction) / max(totalCount, 1)
         verifyProgress = min(max(verifyProgress, normalized), 1.0)
+    }
+
+    private func shouldUseModernVerificationProgress(in manifest: DownloadManifest) -> Bool {
+        let hasLegacyPackage = manifest.items.contains { item in
+            item.name.caseInsensitiveCompare("InstallAssistantAuto.pkg") == .orderedSame
+                || item.url.lastPathComponent.caseInsensitiveCompare("InstallAssistantAuto.pkg") == .orderedSame
+        }
+        if hasLegacyPackage {
+            return false
+        }
+
+        let hasModernPackage = manifest.items.contains { item in
+            item.name.caseInsensitiveCompare("InstallAssistant.pkg") == .orderedSame
+                || item.url.lastPathComponent.caseInsensitiveCompare("InstallAssistant.pkg") == .orderedSame
+        }
+        return hasModernPackage
     }
 
     private func verifyFileSize(for fileURL: URL, expectedBytes: Int64, fileName: String) throws {
@@ -539,11 +558,11 @@ extension MontereyDownloadFlowModel {
             )
         }
 
-        let chunks: [IntegrityChunk]
+        let chunkTable: IntegrityChunkTable
         do {
-            chunks = try parseIntegrityChunks(from: integrityData, fileName: item.name)
+            chunkTable = try parseIntegrityChunkTable(from: integrityData, fileName: item.name)
             AppLogging.info(
-                "IntegrityData: sparsowano \(chunks.count) chunkow dla \(item.name)",
+                "IntegrityData: sparsowano \(chunkTable.totalChunks) chunkow dla \(item.name)",
                 category: "Downloader"
             )
         } catch let error as DownloadFailureReason {
@@ -562,30 +581,44 @@ extension MontereyDownloadFlowModel {
         }
         defer { try? fileHandle.close() }
 
-        let totalChunkBytes = max(chunks.reduce(0) { partial, chunk in
-            partial + max(0, chunk.size)
-        }, 1)
+        let totalChunkBytes = max(chunkTable.totalBytes, 1)
+        let progressReportThresholdBytes = 8 * 1_048_576
         var processedChunkBytes = 0
+        var lastReportedChunkBytes = 0
         var offset: UInt64 = 0
-        for (chunkIndex, chunk) in chunks.enumerated() {
+        for chunkIndex in 0..<chunkTable.totalChunks {
             try Task.checkCancellation()
+            let chunk = try readIntegrityChunk(
+                from: integrityData,
+                table: chunkTable,
+                index: chunkIndex,
+                fileName: item.name
+            )
             let computed = try computeSHA256ForIntegrityChunk(
                 fileHandle: fileHandle,
                 offset: offset,
                 size: chunk.size
             ) { processedBytes in
                 processedChunkBytes += processedBytes
+                let shouldReport = (processedChunkBytes - lastReportedChunkBytes) >= progressReportThresholdBytes
+                    || processedChunkBytes >= totalChunkBytes
+                guard shouldReport else { return }
+                lastReportedChunkBytes = processedChunkBytes
                 progressHandler?(min(1.0, Double(processedChunkBytes) / Double(totalChunkBytes)))
             }
-            if shouldLogIntegrityChunkStep(chunkIndex: chunkIndex, total: chunks.count) {
+            if processedChunkBytes > lastReportedChunkBytes {
+                lastReportedChunkBytes = processedChunkBytes
+                progressHandler?(min(1.0, Double(processedChunkBytes) / Double(totalChunkBytes)))
+            }
+            if shouldLogIntegrityChunkStep(chunkIndex: chunkIndex, total: chunkTable.totalChunks) {
                 AppLogging.info(
-                    "IntegrityData chunk \(chunkIndex + 1)/\(chunks.count) \(item.name): expected=\(checksumPreview(chunk.sha256Hex)), actual=\(checksumPreview(computed)), size=\(chunk.size)",
+                    "IntegrityData chunk \(chunkIndex + 1)/\(chunkTable.totalChunks) \(item.name): expected=\(checksumPreview(chunk.sha256Hex)), actual=\(checksumPreview(hexString(computed))), size=\(chunk.size)",
                     category: "Downloader"
                 )
             }
-            guard computed == chunk.sha256Hex else {
+            guard computed == chunk.sha256 else {
                 throw DownloadFailureReason.verificationFailed(
-                    "Weryfikacja IntegrityData nie powiodla sie dla \(item.name) (chunk \(chunkIndex + 1)/\(chunks.count), expected=\(checksumPreview(chunk.sha256Hex)), actual=\(checksumPreview(computed)))"
+                    "Weryfikacja IntegrityData nie powiodla sie dla \(item.name) (chunk \(chunkIndex + 1)/\(chunkTable.totalChunks), expected=\(checksumPreview(chunk.sha256Hex)), actual=\(checksumPreview(hexString(computed))))"
                 )
             }
             offset += UInt64(chunk.size)
@@ -603,7 +636,7 @@ extension MontereyDownloadFlowModel {
         offset: UInt64,
         size: Int,
         progressPerBytes: ((Int) -> Void)? = nil
-    ) throws -> String {
+    ) throws -> Data {
         try fileHandle.seek(toOffset: offset)
         var remaining = size
         var hasher = SHA256()
@@ -611,18 +644,24 @@ extension MontereyDownloadFlowModel {
 
         while remaining > 0 {
             let blockSize = min(readBlockSize, remaining)
-            let data = fileHandle.readData(ofLength: blockSize)
-            guard !data.isEmpty else {
+            var bytesRead = 0
+            autoreleasepool {
+                let data = fileHandle.readData(ofLength: blockSize)
+                bytesRead = data.count
+                if !data.isEmpty {
+                    hasher.update(data: data)
+                }
+            }
+            guard bytesRead > 0 else {
                 throw DownloadFailureReason.verificationFailed(
                     "Nieoczekiwany koniec pliku podczas weryfikacji IntegrityData"
                 )
             }
-            hasher.update(data: data)
-            remaining -= data.count
-            progressPerBytes?(data.count)
+            remaining -= bytesRead
+            progressPerBytes?(bytesRead)
         }
 
-        return hasher.finalize().map { String(format: "%02x", $0) }.joined().uppercased()
+        return Data(hasher.finalize())
     }
 
     private func shouldLogIntegrityChunkStep(chunkIndex: Int, total: Int) -> Bool {
@@ -633,10 +672,21 @@ extension MontereyDownloadFlowModel {
 
     private struct IntegrityChunk {
         let size: Int
-        let sha256Hex: String
+        let sha256: Data
+
+        var sha256Hex: String {
+            sha256.map { String(format: "%02X", $0) }.joined()
+        }
     }
 
-    private func parseIntegrityChunks(from data: Data, fileName: String) throws -> [IntegrityChunk] {
+    private struct IntegrityChunkTable {
+        let totalChunks: Int
+        let chunkStart: Int
+        let chunkEnd: Int
+        let totalBytes: Int
+    }
+
+    private func parseIntegrityChunkTable(from data: Data, fileName: String) throws -> IntegrityChunkTable {
         guard data.count >= 36 else {
             throw DownloadFailureReason.verificationFailed(
                 "IntegrityData ma niepoprawny format dla \(fileName)"
@@ -665,26 +715,78 @@ extension MontereyDownloadFlowModel {
             )
         }
 
-        let expectedChunkBytes = Int(totalChunks) * 36
+        guard totalChunks > 0 else {
+            throw DownloadFailureReason.verificationFailed(
+                "IntegrityData ma niezgodna liczbe chunkow dla \(fileName)"
+            )
+        }
+        guard totalChunks <= UInt64(Int.max / 36) else {
+            throw DownloadFailureReason.verificationFailed(
+                "IntegrityData ma zbyt duza liczbe chunkow dla \(fileName)"
+            )
+        }
+
+        let totalChunksInt = Int(totalChunks)
+        let expectedChunkBytes = totalChunksInt * 36
         guard chunkEnd - chunkStart == expectedChunkBytes else {
             throw DownloadFailureReason.verificationFailed(
                 "IntegrityData ma niezgodna liczbe chunkow dla \(fileName)"
             )
         }
 
-        var chunks: [IntegrityChunk] = []
-        chunks.reserveCapacity(Int(totalChunks))
-
-        for index in 0..<Int(totalChunks) {
+        var totalBytes = 0
+        for index in 0..<totalChunksInt {
             let base = chunkStart + (index * 36)
             let size = Int(readUInt32LE(data, at: base))
-            let hashRange = (base + 4)..<(base + 36)
-            let hashData = data.subdata(in: hashRange)
-            let hashHex = hashData.map { String(format: "%02X", $0) }.joined()
-            chunks.append(IntegrityChunk(size: size, sha256Hex: hashHex))
+            guard size > 0 else {
+                throw DownloadFailureReason.verificationFailed(
+                    "IntegrityData zawiera niepoprawny rozmiar chunka dla \(fileName)"
+                )
+            }
+            guard totalBytes <= Int.max - size else {
+                throw DownloadFailureReason.verificationFailed(
+                    "IntegrityData ma niepoprawne sumaryczne rozmiary chunkow dla \(fileName)"
+                )
+            }
+            totalBytes += size
         }
 
-        return chunks
+        return IntegrityChunkTable(
+            totalChunks: totalChunksInt,
+            chunkStart: chunkStart,
+            chunkEnd: chunkEnd,
+            totalBytes: totalBytes
+        )
+    }
+
+    private func readIntegrityChunk(
+        from data: Data,
+        table: IntegrityChunkTable,
+        index: Int,
+        fileName: String
+    ) throws -> IntegrityChunk {
+        guard index >= 0, index < table.totalChunks else {
+            throw DownloadFailureReason.verificationFailed(
+                "IntegrityData ma niepoprawny indeks chunka dla \(fileName)"
+            )
+        }
+
+        let base = table.chunkStart + (index * 36)
+        guard base >= table.chunkStart, base + 36 <= table.chunkEnd else {
+            throw DownloadFailureReason.verificationFailed(
+                "IntegrityData ma niepoprawne offsety chunkow dla \(fileName)"
+            )
+        }
+
+        let size = Int(readUInt32LE(data, at: base))
+        guard size > 0 else {
+            throw DownloadFailureReason.verificationFailed(
+                "IntegrityData zawiera niepoprawny rozmiar chunka dla \(fileName)"
+            )
+        }
+
+        let digestRange = (base + 4)..<(base + 36)
+        return IntegrityChunk(size: size, sha256: Data(data[digestRange]))
     }
 
     private func readUInt8(_ data: Data, at offset: Int) -> UInt8 {
@@ -747,6 +849,10 @@ extension MontereyDownloadFlowModel {
             return trimmed
         }
         return "\(trimmed.prefix(8))...\(trimmed.suffix(8))"
+    }
+
+    private func hexString(_ data: Data) -> String {
+        data.map { String(format: "%02X", $0) }.joined()
     }
 
 }

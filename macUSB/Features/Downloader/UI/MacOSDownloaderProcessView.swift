@@ -290,7 +290,7 @@ extension MacOSDownloaderWindowShellView {
         case .buildingInstaller:
             return downloadFlowModel.buildProgress
         case .cleanup:
-            return downloadFlowModel.cleanupProgress
+            return nil
         }
     }
 
