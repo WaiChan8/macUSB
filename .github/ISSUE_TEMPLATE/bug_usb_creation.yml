@@ -1,0 +1,164 @@
+name: "Bug Report - USB Creation"
+description: "Report issues related to analysis and bootable USB creation flow."
+title: "[USB Creation] "
+labels: ["bug", "triage", "usb-creation"]
+body:
+  - type: markdown
+    attributes:
+      value: |
+        Please fill in all required fields.
+        Attach diagnostic logs exported from `Help -> Export diagnostic logs...` and screenshots.
+
+  - type: input
+    id: app_version
+    attributes:
+      label: "macUSB version"
+      placeholder: "e.g., v2.1"
+    validations:
+      required: true
+
+  - type: input
+    id: host_os_version
+    attributes:
+      label: "Host macOS version"
+      placeholder: "e.g., macOS Sequoia 15.4"
+    validations:
+      required: true
+
+  - type: dropdown
+    id: host_architecture
+    attributes:
+      label: "Host architecture"
+      options:
+        - "Apple Silicon"
+        - "Intel"
+    validations:
+      required: true
+
+  - type: dropdown
+    id: helper_repair
+    attributes:
+      label: "Was helper repair executed? (Tools -> Repair helper)"
+      options:
+        - "Yes"
+        - "No"
+    validations:
+      required: true
+
+  - type: input
+    id: target_system
+    attributes:
+      label: "Which system were you creating?"
+      placeholder: "e.g., Mac OS X Tiger 10.4 / macOS Ventura 13.7"
+    validations:
+      required: true
+
+  - type: dropdown
+    id: installer_origin
+    attributes:
+      label: "Installer source origin"
+      options:
+        - "Downloader"
+        - "Local file"
+        - "Other"
+    validations:
+      required: true
+
+  - type: dropdown
+    id: installer_format
+    attributes:
+      label: "Installer format"
+      options:
+        - ".dmg"
+        - ".app"
+        - ".iso"
+        - ".cdr"
+        - "Other"
+    validations:
+      required: true
+
+  - type: textarea
+    id: installer_source_details
+    attributes:
+      label: "Installer source details"
+      description: "Where does the installer come from? Add link/source details."
+      placeholder: "e.g., Downloaded in macUSB Downloader / local file from ..."
+    validations:
+      required: true
+
+  - type: dropdown
+    id: failure_stage
+    attributes:
+      label: "Failure stage"
+      options:
+        - "Analysis"
+        - "USB creation"
+        - "Other"
+    validations:
+      required: true
+
+  - type: dropdown
+    id: media_type
+    attributes:
+      label: "Target media type"
+      options:
+        - "Pendrive"
+        - "Hard drive"
+    validations:
+      required: true
+
+  - type: input
+    id: media_capacity
+    attributes:
+      label: "Target media capacity"
+      placeholder: "e.g., 16 GB / 32 GB / 64 GB"
+    validations:
+      required: true
+
+  - type: dropdown
+    id: reproducibility
+    attributes:
+      label: "Is the issue reproducible?"
+      options:
+        - "Always"
+        - "Sometimes"
+        - "Happened once"
+    validations:
+      required: true
+
+  - type: textarea
+    id: repro_steps
+    attributes:
+      label: "Steps to reproduce"
+      placeholder: |
+        1. Open macUSB
+        2. Select installer ...
+        3. Select target USB ...
+        4. Start process
+        5. Observe error
+    validations:
+      required: true
+
+  - type: textarea
+    id: expected_result
+    attributes:
+      label: "Expected result"
+    validations:
+      required: true
+
+  - type: textarea
+    id: actual_result
+    attributes:
+      label: "Actual result"
+    validations:
+      required: true
+
+  - type: checkboxes
+    id: attachments_check
+    attributes:
+      label: "Required attachments"
+      options:
+        - label: "I attached diagnostic logs exported from `Help -> Export diagnostic logs...`"
+          required: true
+        - label: "I attached screenshots showing the issue"
+          required: true

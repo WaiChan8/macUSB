@@ -1,0 +1,118 @@
+name: "Bug Report - Other App Issues"
+description: "Report non-downloader and non-USB-creation issues in macUSB."
+title: "[App] "
+labels: ["bug", "triage", "app"]
+body:
+  - type: markdown
+    attributes:
+      value: |
+        Please fill in all required fields.
+        Attach diagnostic logs exported from `Help -> Export diagnostic logs...` and screenshots.
+
+  - type: input
+    id: app_version
+    attributes:
+      label: "macUSB version"
+      placeholder: "e.g., v2.1"
+    validations:
+      required: true
+
+  - type: input
+    id: host_os_version
+    attributes:
+      label: "Host macOS version"
+      placeholder: "e.g., macOS Sequoia 15.4"
+    validations:
+      required: true
+
+  - type: dropdown
+    id: host_architecture
+    attributes:
+      label: "Host architecture"
+      options:
+        - "Apple Silicon"
+        - "Intel"
+    validations:
+      required: true
+
+  - type: dropdown
+    id: app_area
+    attributes:
+      label: "Affected app area"
+      options:
+        - "UI"
+        - "Permissions"
+        - "Helper"
+        - "Stability"
+        - "Localization"
+        - "Other"
+    validations:
+      required: true
+
+  - type: dropdown
+    id: crash
+    attributes:
+      label: "Did the app crash?"
+      options:
+        - "Yes"
+        - "No"
+    validations:
+      required: true
+
+  - type: dropdown
+    id: regression
+    attributes:
+      label: "Did this start after updating macUSB?"
+      options:
+        - "Yes"
+        - "No"
+        - "Not sure"
+    validations:
+      required: true
+
+  - type: dropdown
+    id: reproducibility
+    attributes:
+      label: "Is the issue reproducible?"
+      options:
+        - "Always"
+        - "Sometimes"
+        - "Happened once"
+    validations:
+      required: true
+
+  - type: textarea
+    id: repro_steps
+    attributes:
+      label: "Steps to reproduce"
+      placeholder: |
+        1. Open macUSB
+        2. Go to ...
+        3. Click ...
+        4. Observe issue
+    validations:
+      required: true
+
+  - type: textarea
+    id: expected_result
+    attributes:
+      label: "Expected result"
+    validations:
+      required: true
+
+  - type: textarea
+    id: actual_result
+    attributes:
+      label: "Actual result"
+    validations:
+      required: true
+
+  - type: checkboxes
+    id: attachments_check
+    attributes:
+      label: "Required attachments"
+      options:
+        - label: "I attached diagnostic logs exported from `Help -> Export diagnostic logs...`"
+          required: true
+        - label: "I attached screenshots showing the issue"
+          required: true
